@@ -1,0 +1,707 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  password     String?
+  role         String   @default("user")
+  phone        String?
+  gender       String?
+  avatar       String?
+  isActive     Boolean  @default(true)
+  type_account String   @default("normal")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
+  tenantId Int?
+
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
+  userTenantRoles       UserTenantRole[]
+  orders                Order[]
+  carts                 Cart?
+  payouts               Payout[]
+  financialTransactions FinancialTransaction[]
+  auditLogs             AuditLog[]
+  Product               Product[]
+  ProductReview         ProductReview[]
+  blogs                 Blog[]
+}
+
+model Tenant {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usedAccounts           Int      @default(0)  
+  usedSKUs               Int      @default(0)  
+  currentConcurrentUsers Int      @default(0)  
+
+  maxAccounts            Int      @default(0)  
+  maxSKUs                Int      @default(0)  
+  maxConcurrentUsers     Int      @default(0)  
+
+  users User[]
+
+  userTenantRoles UserTenantRole[]
+
+  products              Product[]
+  warehouses            Warehouse[]
+  attributes            Attribute[]
+  orders                Order[]
+  paymentMethods        PaymentMethod[]
+  payments              Payment[]
+  carts                 Cart[]
+  shipments             Shipment[]
+  financialTransactions FinancialTransaction[]
+  payouts               Payout[]
+  commissions           Commission[]
+  Category              Category[]
+  Brand                 Brand[]
+  configs               Config[]
+  blogs                 Blog[]
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userTenantRoles UserTenantRole[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([roleId, permissionId])
+}
+
+model UserTenantRole {
+  userId   Int
+  tenantId Int
+  roleId   Int
+
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, tenantId, roleId])
+}
+
+model Product {
+  id             Int           @id @default(autoincrement())
+  tenantId       Int
+  name           String
+  slug           String        @unique
+  description    String?
+  basePrice      Float
+  thumb          String?
+  images         Json?
+  status         ProductStatus @default(ACTIVE)
+  isPublished    Boolean       @default(false)
+  isFeatured     Boolean       @default(false)
+  totalRatings   Float         @default(0)
+  totalReviews   Int           @default(0)
+  numberSold     Int           @default(0)
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  categoryId     Int?
+  brandId        Int?
+  createdById    Int?
+  weight         Float?
+  length         Float?
+  width          Float?
+  height         Float?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+  category   Category?          @relation(fields: [categoryId], references: [id])
+  brand      Brand?             @relation(fields: [brandId], references: [id])
+  attributes ProductAttribute[]
+  variants   ProductVariant[]
+  reviews    ProductReview[]
+  createdBy  User?              @relation(fields: [createdById], references: [id])
+  discounts  ProductDiscount[]
+}
+
+model ProductVariant {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  sku        String   @unique
+  barcode    String?  @unique
+  priceDelta Float
+  price      Float?
+  attrValues Json?
+  thumb      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product         Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory       Inventory[]
+  orderItems      OrderItem[]
+  cartItems       CartItem[]
+  shipmentItems   ShipmentItem[]
+  attributeValues VariantAttributeValue[]
+}
+
+model Attribute {
+  id        Int           @id @default(autoincrement())
+  tenantId  Int
+  name      String
+  type      AttributeType @default(TEXT) // text, select, color, size, etc
+  position  Int
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id])
+  values   AttributeValue[]
+  products ProductAttribute[]
+}
+
+model AttributeValue {
+  id          Int      @id @default(autoincrement())
+  attributeId Int
+  value       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attribute Attribute               @relation(fields: [attributeId], references: [id])
+  variants  VariantAttributeValue[]
+}
+
+model VariantAttributeValue {
+  variantId        Int
+  attributeValueId Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  attributeValue AttributeValue @relation(fields: [attributeValueId], references: [id], onDelete: Restrict)
+
+  @@id([variantId, attributeValueId])
+}
+
+model ProductAttribute {
+  productId   Int
+  attributeId Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@id([productId, attributeId])
+}
+
+model Warehouse {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int
+  code      String?  @unique
+  name      String
+  location  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant      @relation(fields: [tenantId], references: [id])
+  inventory Inventory[]
+  orderItems        OrderItem[]
+}
+
+model Inventory {
+  id               Int      @id @default(autoincrement())
+  productVariantId Int
+  warehouseId      Int
+  qty              Int
+  reservedQty      Int      @default(0) // số lượng đã đặt nhưng chưa xuất kho
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  variant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id])
+}
+
+model ProductReview {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  userId    Int
+  rating    Int // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+model ProductDiscount {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  name      String
+  discount  Float // số tiền giảm hoặc phần trăm (tùy logic)
+  isPercent Boolean  @default(false)
+  startAt   DateTime
+  endAt     DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Cart {
+  id       Int @id @default(autoincrement())
+  tenantId Int
+  userId   Int @unique // Một user chỉ có 1 cart hiện tại
+
+  status CartStatus @default(ACTIVE) // ACTIVE, CHECKOUT, ABANDONED
+  total  Float? // Tổng tiền hiện tại (tính toán hoặc cache)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  items CartItem[]
+}
+
+model CartItem {
+  id               Int      @id @default(autoincrement())
+  cartId           Int
+  productVariantId Int
+  quantity         Int
+  priceAtAdd       Float // Giá của variant khi thêm vào cart, tránh thay đổi giá sau ảnh hưởng đơn hàng
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@unique([cartId, productVariantId]) // Mỗi variant chỉ xuất hiện 1 lần trong 1 Cart
+}
+
+model Category {
+  id             Int            @id @default(autoincrement())
+  tenantId       Int
+  parentId       Int? // nếu là category con
+  name           String
+  slug           String         @unique
+  description    String?
+  thumb          String?
+  status         CategoryStatus @default(ACTIVE)
+  position       Int            @default(0)
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id])
+  parent   Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryChildren")
+  products Product[]
+}
+
+model Brand {
+  id          Int         @id @default(autoincrement())
+  tenantId    Int
+  name        String
+  slug        String      @unique
+  description String?
+  thumb       String?
+  status      BrandStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  products Product[]
+}
+
+
+
+model OrderItem {
+  id               Int            @id @default(autoincrement())
+  orderId          Int
+  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariantId Int
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  sku              String
+  quantity         Int
+  unitPrice        Int
+  warehouseId          Int?     
+  warehouse            Warehouse? @relation(fields: [warehouseId], references: [id]) 
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model PaymentMethod {
+  id        Int       @id @default(autoincrement())
+  tenantId  Int
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  code      String    @unique
+  name      String
+  payments  Payment[]
+  orders    Order[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Payment {
+  id            Int           @id @default(autoincrement())
+  orderId       Int
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenantId      Int
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  methodId      Int
+  method        PaymentMethod @relation(fields: [methodId], references: [id])
+  amount        Int
+  currency      String        @default("VND")
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @unique
+  providerData  Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  refunds       Refund[]
+}
+
+model Refund {
+  id        Int          @id @default(autoincrement())
+  paymentId Int
+  payment   Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount    Int
+  reason    String?
+  status    RefundStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Shipment {
+  id         Int       @id @default(autoincrement())
+  orderId    Int
+  order      Order     @relation(fields: [orderId], references: [id])
+  tenantId   Int
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  courier    String
+  service    String
+  fee        Int
+  trackingNo String    @unique
+  status     String // ví dụ: CREATED, IN_TRANSIT, DELIVERED
+  shippedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  items          ShipmentItem[]
+  trackingEvents TrackingEvent[]
+}
+
+model ShipmentItem {
+  id               Int            @id @default(autoincrement())
+  shipmentId       Int
+  shipment         Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  productVariantId Int
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  quantity         Int
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model TrackingEvent {
+  id         Int      @id @default(autoincrement())
+  shipmentId Int
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status     String
+  location   String?
+  eventTime  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String // e.g. "CREATE_PRODUCT", "UPDATE_USER", "LOGIN", "DELETE_ORDER"
+  resource   String? // e.g. "Product", "User", "Order"
+  resourceId Int? // id của resource nếu có
+  method     String // HTTP method
+  route      String // request path
+  ip         String?
+  userAgent  String?
+  payload    Json? // change summary / additional data (cẩn thận không lưu password)
+  createdAt  DateTime @default(now())
+  userId     Int? // Thêm trường userId để liên kết với User
+  user       User?    @relation(fields: [userId], references: [id])
+}
+
+model FinancialTransaction {
+  id           Int             @id @default(autoincrement())
+  tenantId     Int
+  orderId      Int?
+  payoutId     Int?
+  commissionId Int?
+  receiverType ReceiverType
+  userId       Int?
+  type         TransactionType
+  amount       Int
+  currency     String          @default("VND")
+  reference    String?
+  description  String?
+  createdAt    DateTime        @default(now())
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  order      Order?      @relation(fields: [orderId], references: [id])
+  payout     Payout?     @relation(fields: [payoutId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+  commission Commission? @relation(fields: [commissionId], references: [id])
+}
+
+model Payout {
+  id           Int          @id @default(autoincrement())
+  tenantId     Int
+  receiverType ReceiverType
+  receiverId   Int?
+
+  amount      Int
+  currency    String       @default("VND")
+  status      PayoutStatus @default(PENDING)
+  method      String?
+  reference   String?
+  createdBy   Int?
+  createdAt   DateTime     @default(now())
+  processedAt DateTime?
+
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id])
+  user                  User?                  @relation(fields: [receiverId], references: [id])
+  financialTransactions FinancialTransaction[]
+}
+
+model Commission {
+  id       Int @id @default(autoincrement())
+  tenantId Int
+  orderId  Int
+
+  amount    Int
+  rate      Float
+  createdAt DateTime @default(now())
+
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id])
+  order                 Order                  @relation(fields: [orderId], references: [id])
+  financialTransactions FinancialTransaction[]
+}
+
+model Config {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int
+  name      String?
+  email     String?
+  mobile    String?
+  address   String?
+  googlemap String?
+  facebook  String?
+  zalo      String?
+  instagram String?
+  tiktok    String?
+  youtube   String?
+  x         String?
+  linkedin  String?
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Blog {
+  id          Int     @id @default(autoincrement())
+  title       String
+  slug        String  @unique
+  description String
+  thumb       String?
+  content     Json
+
+  numberViews Int     @default(0)
+  isPublished Boolean @default(false)
+
+  createdById Int
+  createdBy   User @relation(fields: [createdById], references: [id])
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Contact {
+  id        Int           @id @default(autoincrement())
+  name      String
+  email     String
+  phone     String
+  message   String
+  status    ContactStatus @default(PENDING)
+  tenantId  Int
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+enum ContactStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReceiverType {
+  USER
+  STAFF
+  DISTRIBUTOR
+  VENDOR
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum TransactionType {
+  REVENUE
+  FEE
+  COMMISSION
+  REFUND
+  PAYOUT
+  DISCOUNT
+  ADJUSTMENT
+}
+
+model Order {
+  id                    Int                    @id @default(autoincrement())
+  userId                Int
+  user                  User                   @relation(fields: [userId], references: [id])
+  tenantId              Int
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id])
+  paymentMethodId       Int?
+  paymentMethod         PaymentMethod?          @relation(fields: [paymentMethodId], references: [id])
+  items                 OrderItem[]
+  payments              Payment[]
+  totalAmount           Int
+  currency              String                 @default("VND")
+  shippingInfo          Json?
+  shipments             Shipment[]
+  status                OrderStatus            @default(DRAFT)
+  paymentStatus         PaymentStatus          @default(PENDING)
+  commissions           Commission[]
+  financialTransactions FinancialTransaction[]
+  reservedUntil         DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  shippingFee           Float
+  deliveryMethod        DeliveryMethod         @default(STANDARD)
+  inventoryUpdated      String?
+}
+
+enum DeliveryMethod {
+  STANDARD
+  XTEAM
+}
+
+
+enum ShippingService {
+  STANDARD
+  EXPRESS
+  OVERNIGHT
+}
+
+enum OrderStatus {
+  DRAFT
+  PAID_PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+  OUT_OF_STOCK
+  DELETED
+}
+
+enum AttributeType {
+  TEXT
+  SELECT
+  MULTISELECT
+  COLOR
+  SIZE
+}
+
+enum CartStatus {
+  ACTIVE
+  CHECKOUT
+  ABANDONED
+}
+
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+  DELETED
+}
+
+enum BrandStatus {
+  ACTIVE
+  INACTIVE
+  DELETED
+}

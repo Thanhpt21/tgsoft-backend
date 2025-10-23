@@ -1,0 +1,33 @@
+// src/main.ts
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
+import { ConfigService } from '@nestjs/config';
+import cookieParser from 'cookie-parser';
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT') || 3000;
+
+  app.use(cookieParser());
+  app.enableCors({
+    origin:'http://localhost:3000',
+    methods: 'GET,POST,PUT,DELETE,OPTIONS,PATCH', 
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id',],
+    credentials: true, 
+  });
+
+  const uploadsPath = join(process.cwd(), 'uploads');
+  app.useStaticAssets(uploadsPath, {
+    prefix: '/uploads/',
+  });
+
+  app.setGlobalPrefix('api');
+
+  await app.listen(port);
+  console.log(`🚀 Server is running on: http://localhost:${port}/api`);
+}
+bootstrap();

@@ -1,0 +1,37 @@
+import { Controller, Post, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UploadService } from './upload.service';
+
+@Controller('upload')
+export class UploadController {
+  constructor(private uploadService: UploadService) {}
+
+  @Post('avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAvatar(@UploadedFile() file: Express.Multer.File) {
+    // Kiểm tra file có tồn tại không
+    if (!file) {
+      throw new BadRequestException('File không được để trống');
+    }
+
+    // Validate file type
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Chỉ chấp nhận file ảnh (JPEG, PNG, JPG, WEBP)');
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('File không được vượt quá 5MB');
+    }
+
+    // Upload file và lấy URL
+    const imageUrl = await this.uploadService.uploadLocalImage(file);
+    return {
+      success: true,
+      message: 'Upload ảnh thành công',
+      data: { url: imageUrl },
+    };
+  }
+}
