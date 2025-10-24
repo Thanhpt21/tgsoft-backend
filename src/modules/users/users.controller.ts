@@ -16,15 +16,10 @@ import {
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UserRole } from './enums/user.enums';
-import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { SelfOrAdminGuard } from 'src/common/guards/self-or-admin.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from '../upload/upload.service';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
-import { TenantId } from 'src/common/decorators/tenant-id.decorator';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 
 

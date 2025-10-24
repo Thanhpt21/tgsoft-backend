@@ -63,7 +63,6 @@ async findAll(productId: number) {
       attribute: {
         id: vav.attributeValue.attribute.id,
         name: vav.attributeValue.attribute.name,
-        type: vav.attributeValue.attribute.type,
       },
     }));
 

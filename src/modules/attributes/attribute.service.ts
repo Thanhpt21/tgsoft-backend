@@ -27,7 +27,6 @@ export class AttributesService extends TenantAwareService {
       data: {
         name: dto.name,
         position: dto.position ?? 1,
-        type: dto.type,
         tenant: { connect: { id: this.tenantId } },
       },
     });

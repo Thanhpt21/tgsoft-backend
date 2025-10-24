@@ -1,4 +1,5 @@
-// src/main.ts
+import './config/env.config'; // PHẢI Ở ĐẦU TIÊN!
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -10,14 +11,24 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT') || 3000;
+
+  const port = configService.get<number>('PORT');
+  const nodeEnv = configService.get<string>('NODE_ENV');
+
+  console.log('🚀 Environment:', nodeEnv);
+  console.log('🔌 Port:', port);
+
+  if (!port) {
+    throw new Error('PORT environment variable is not defined.');
+  }
 
   app.use(cookieParser());
+
   app.enableCors({
-    origin:'http://localhost:3000',
-    methods: 'GET,POST,PUT,DELETE,OPTIONS,PATCH', 
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id',],
-    credentials: true, 
+    origin: 'http://localhost:3000',
+    methods: 'GET,POST,PUT,DELETE,OPTIONS,PATCH',
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
+    credentials: true,
   });
 
   const uploadsPath = join(process.cwd(), 'uploads');
@@ -28,6 +39,9 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   await app.listen(port);
-  console.log(`🚀 Server is running on: http://localhost:${port}/api`);
+
+  console.log(`✅ Server is running on: http://localhost:${port}/api`);
+  console.log(`📊 Database: ${configService.get<string>('DATABASE_URL')?.split('@')[1]?.split('/')[0] || 'N/A'}`);
 }
+
 bootstrap();

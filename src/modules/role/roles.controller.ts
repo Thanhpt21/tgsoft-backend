@@ -14,9 +14,7 @@ import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { UserRole } from '../users/enums/user.enums';
+
 
 
 @Controller('roles')
@@ -25,8 +23,7 @@ export class RolesController {
 
   // Tạo role mới (admin)
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   async createRole(@Body() dto: CreateRoleDto) {
     return this.rolesService.createRole(dto);
   }
@@ -54,16 +51,14 @@ export class RolesController {
 
   // Cập nhật role (admin)
   @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   async updateRole(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRoleDto) {
     return this.rolesService.updateRole(id, dto);
   }
 
   // Xóa role (admin)
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   async deleteRole(@Param('id', ParseIntPipe) id: number) {
     return this.rolesService.deleteRole(id);
   }

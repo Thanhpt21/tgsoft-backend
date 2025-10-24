@@ -1,25 +1,9 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsEnum } from 'class-validator';
-
-export enum GHTKPickOption {
-  COD = 'cod',
-  POST = 'post',
-}
-
-export enum GHTKDeliverOption {
-  NONE = 'none',
-  XTEAM = 'xteam',
-}
-
-export enum GHTKTransportOption {
-  ROAD = 'road',
-  FLY = 'fly',
-}
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsIn } from 'class-validator';
 
 export class CalculateFeeDto {
   @IsString()
   @IsNotEmpty()
   province: string;
-
 
   @IsString()
   @IsNotEmpty()
@@ -29,28 +13,28 @@ export class CalculateFeeDto {
   @IsOptional()
   ward?: string;
 
-
   @IsString()
   @IsOptional()
   address?: string;
 
-
   @IsNumber()
   weight: number;
-
 
   @IsNumber()
   @IsOptional()
   value?: number;
 
-  @IsEnum(GHTKDeliverOption)
+  // Thay thế enum DeliverOption bằng IsIn
+  @IsString()
   @IsOptional()
-  deliver_option?: GHTKDeliverOption;
+  @IsIn(['none', 'xteam'])
+  deliver_option?: string;
 
-
-  @IsEnum(GHTKTransportOption)
+  // Thay thế enum TransportOption bằng IsIn
+  @IsString()
   @IsOptional()
-  transport?: GHTKTransportOption;
+  @IsIn(['road', 'fly'])
+  transport?: string;
 }
 
 export class CreateGHTKOrderDto {

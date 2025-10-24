@@ -30,18 +30,19 @@ export class UsersService extends TenantAwareService {
     const role = 'user';
     
     // Upload file nếu có
-    let avatarUrl: string | null = null;
+    let avatar: string | null = null;
     if (file) {
-      avatarUrl = await this.uploadService.uploadLocalImage(file);
+      avatar = await this.uploadService.uploadLocalImage(file);
     }
 
 
     const userData = {
       ...createUserDto,
       password: hashedPassword,
-      role,  // Gán tên vai trò thay vì roleId
-      avatarUrl,
+      role, 
+      avatar,
     };
+
 
     // Nếu là admin thì không cần tenantId
     if (this.request.user?.role === 'admin') {
@@ -62,6 +63,8 @@ export class UsersService extends TenantAwareService {
       data: new UserResponseDto(user),
     };
   }
+
+  
 
 
   async getUsers(page = 1, limit = 10, search = '') {

@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -187,7 +188,6 @@ model Attribute {
   id        Int           @id @default(autoincrement())
   tenantId  Int
   name      String
-  type      AttributeType @default(TEXT) // text, select, color, size, etc
   position  Int
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
@@ -680,13 +680,6 @@ enum ProductStatus {
   DELETED
 }
 
-enum AttributeType {
-  TEXT
-  SELECT
-  MULTISELECT
-  COLOR
-  SIZE
-}
 
 enum CartStatus {
   ACTIVE
