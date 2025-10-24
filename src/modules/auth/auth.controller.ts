@@ -32,11 +32,10 @@ export class AuthController {
 
     res.cookie('access_token', access_token, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 1000 * 60 * 60 * 24 * 7,
       sameSite: 'lax',
       path: '/',
-      domain: 'localhost',
     });
 
     return { user, access_token };

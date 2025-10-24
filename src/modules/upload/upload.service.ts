@@ -23,7 +23,7 @@ export class UploadService {
     await writeFile(uploadPath, file.buffer);
 
 
-    return `/uploads/${filename}`;
+    return `/uploads/${filename}`.replace(/^\/+/, ''); 
   }
 
   async deleteLocalImage(relativePath: string): Promise<void> {

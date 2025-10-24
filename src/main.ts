@@ -15,8 +15,6 @@ async function bootstrap() {
   const port = configService.get<number>('PORT');
   const nodeEnv = configService.get<string>('NODE_ENV');
 
-  console.log('🚀 Environment:', nodeEnv);
-  console.log('🔌 Port:', port);
 
   if (!port) {
     throw new Error('PORT environment variable is not defined.');
@@ -41,7 +39,6 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`✅ Server is running on: http://localhost:${port}/api`);
-  console.log(`📊 Database: ${configService.get<string>('DATABASE_URL')?.split('@')[1]?.split('/')[0] || 'N/A'}`);
 }
 
 bootstrap();
