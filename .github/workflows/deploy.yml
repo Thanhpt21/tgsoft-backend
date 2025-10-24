@@ -29,9 +29,12 @@ jobs:
 
       - name: Build application
         run: npm run build
+        
+      - name: ✅ Build successful
+        run: echo "Build completed successfully!"
 
-  # Job 2: Build Docker Image
-  build-docker:
+  # Job 2: Build Docker (Local only - không push)
+  build-docker-local:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -40,22 +43,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/tgsoft-backend:latest
-            ${{ secrets.DOCKER_USERNAME }}/tgsoft-backend:${{ github.sha }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/tgsoft-backend:latest
-          cache-to: type=inline
+      - name: Build Docker image (no push)
+        run: docker build -t tgsoft-backend:latest .
+        
+      - name: ✅ Docker build successful
+        run: echo "Docker image built successfully!"
