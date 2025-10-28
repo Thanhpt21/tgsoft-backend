@@ -18,7 +18,7 @@ import { Logger } from '@nestjs/common';
     origin: process.env.CLIENT_URL,
     credentials: true,
   },
-  namespace: '/chat',
+  path: '/chat',
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
