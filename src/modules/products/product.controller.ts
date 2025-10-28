@@ -61,12 +61,11 @@ export class ProductController {
     return this.productService.getProductBySlug(slug);
   }
 
-  @Get('all/list/:tenantId')
+  @Get('all/list')
   async getAllProducts(
-    @Param('tenantId') tenantId: number, // Lấy tenantId từ tham số URL
     @Query('search') search: string = '', // Tham số tìm kiếm (mặc định là rỗng)
   ) {
-    return this.productService.getAllProductsWithSearch(search, tenantId);
+    return this.productService.getAllProductsWithSearch(search);
   }
 
 

@@ -868,4 +868,34 @@ export class ChatService {
       this.logger.error('Error cleaning up old sessions:', error);
     }
   }
+
+async getConversationIdsByUserId(
+  userId: number,
+  tenantId?: number,
+): Promise<number[]> {
+  try {
+    const where: any = {
+      userId,
+      status: 'ACTIVE',
+      sessionId: { not: null },
+    };
+
+    if (tenantId) {
+      where.tenantId = tenantId;
+    }
+
+    const conversations = await this.prisma.chatConversation.findMany({
+      where,
+      select: { id: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return conversations.map(c => c.id);
+  } catch (error) {
+    this.logger.error(`Error getting conversationIds for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+  
 }

@@ -253,4 +253,18 @@ export class ChatController {
     );
     return { stats };
   }
+
+  @Get('conversation-ids')
+  async getConversationIds(
+    @Query('userId', ParseIntPipe) userId: number,
+    @Query('tenantId', ParseIntPipe) tenantId?: number,
+  ) {
+    if (!userId) {
+      throw new BadRequestException('userId is required');
+    }
+
+    const conversationIds = await this.chatService.getConversationIdsByUserId(userId, tenantId);
+
+    return { conversationIds };
+  }
 }
