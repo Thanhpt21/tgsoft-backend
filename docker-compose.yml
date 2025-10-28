@@ -25,3 +25,5 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - /root/tgsoft-backend/uploads:/app/uploads

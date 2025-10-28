@@ -1,3 +1,4 @@
+// upload.service.ts
 import { Injectable } from '@nestjs/common';
 import { join } from 'path';
 import { writeFile, unlink, mkdir } from 'fs/promises';
@@ -6,32 +7,30 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class UploadService {
+  private readonly uploadDir = '/app/uploads';  // ĐƯỜNG DẪN TRONG CONTAINER
+
   async uploadLocalImage(file: Express.Multer.File): Promise<string> {
     const filename = `${uuidv4()}-${file.originalname}`;
-    
-    // ⭐ Đường dẫn tuyệt đối đến thư mục uploads (ngang hàng với src)
-    const uploadDir = join(process.cwd(), 'uploads');
-    const uploadPath = join(uploadDir, filename);
+    const uploadPath = join(this.uploadDir, filename);
 
     // Tạo thư mục nếu chưa có
-    if (!existsSync(uploadDir)) {
-      console.log('🆕 Creating uploads directory...');
-      await mkdir(uploadDir, { recursive: true });
+    if (!existsSync(this.uploadDir)) {
+      console.log('Creating uploads directory...');
+      await mkdir(this.uploadDir, { recursive: true });
     }
 
     // Lưu file
     await writeFile(uploadPath, file.buffer);
 
-
-    return `/uploads/${filename}`.replace(/^\/+/, ''); 
+    return `/uploads/${filename}`;
   }
 
   async deleteLocalImage(relativePath: string): Promise<void> {
     try {
-      const filePath = join(process.cwd(), relativePath);
+      const filePath = join(this.uploadDir, relativePath.replace(/^\/uploads\//, ''));
       await unlink(filePath);
     } catch (error) {
-      console.error('❌ Delete error:', error);
+      console.error('Delete error:', error);
     }
   }
 }
