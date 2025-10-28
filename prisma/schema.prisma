@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -19,6 +19,7 @@ model User {
   avatar       String?
   isActive     Boolean  @default(true)
   type_account String   @default("normal")
+  tokenAI       Int @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -37,6 +38,7 @@ model User {
   Product               Product[]
   ProductReview         ProductReview[]
   blogs                 Blog[]
+  chatConversations     ChatConversation[]
 }
 
 model Tenant {
@@ -44,16 +46,17 @@ model Tenant {
   name      String
   slug      String   @unique
   isActive  Boolean  @default(true)
+  expirationDate            DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  usedAccounts           Int      @default(0)  
-  usedSKUs               Int      @default(0)  
-  currentConcurrentUsers Int      @default(0)  
+  usedAccounts           Int @default(0)
+  usedSKUs               Int @default(0)
+  currentConcurrentUsers Int @default(0)
 
-  maxAccounts            Int      @default(0)  
-  maxSKUs                Int      @default(0)  
-  maxConcurrentUsers     Int      @default(0)  
+  maxAccounts        Int @default(0)
+  maxSKUs            Int @default(0)
+  maxConcurrentUsers Int @default(0)
 
   users User[]
 
@@ -74,6 +77,7 @@ model Tenant {
   Brand                 Brand[]
   configs               Config[]
   blogs                 Blog[]
+  chatConversations     ChatConversation[]
 }
 
 model Role {
@@ -185,12 +189,12 @@ model ProductVariant {
 }
 
 model Attribute {
-  id        Int           @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   tenantId  Int
   name      String
   position  Int
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant   Tenant             @relation(fields: [tenantId], references: [id])
   values   AttributeValue[]
@@ -241,9 +245,9 @@ model Warehouse {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant    Tenant      @relation(fields: [tenantId], references: [id])
-  inventory Inventory[]
-  orderItems        OrderItem[]
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  inventory  Inventory[]
+  orderItems OrderItem[]
 }
 
 model Inventory {
@@ -355,8 +359,6 @@ model Brand {
   products Product[]
 }
 
-
-
 model OrderItem {
   id               Int            @id @default(autoincrement())
   orderId          Int
@@ -366,8 +368,8 @@ model OrderItem {
   sku              String
   quantity         Int
   unitPrice        Int
-  warehouseId          Int?     
-  warehouse            Warehouse? @relation(fields: [warehouseId], references: [id]) 
+  warehouseId      Int?
+  warehouse        Warehouse?     @relation(fields: [warehouseId], references: [id])
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 }
@@ -617,7 +619,7 @@ model Order {
   tenantId              Int
   tenant                Tenant                 @relation(fields: [tenantId], references: [id])
   paymentMethodId       Int?
-  paymentMethod         PaymentMethod?          @relation(fields: [paymentMethodId], references: [id])
+  paymentMethod         PaymentMethod?         @relation(fields: [paymentMethodId], references: [id])
   items                 OrderItem[]
   payments              Payment[]
   totalAmount           Int
@@ -636,11 +638,75 @@ model Order {
   inventoryUpdated      String?
 }
 
+model ChatConversation {
+  id        Int                    @id @default(autoincrement())
+  userId    Int? // null nếu là khách
+  sessionId String? // sessionId cho khách chưa login
+  tenantId  Int
+  assignedAdminId Int?
+  status    ChatConversationStatus @default(ACTIVE)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  user     User?         @relation(fields: [userId], references: [id])
+  tenant   Tenant        @relation(fields: [tenantId], references: [id])
+  messages ChatMessage[]
+  
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([assignedAdminId])
+}
+
+model ChatMessage {
+  id             Int        @id @default(autoincrement())
+  conversationId Int
+  senderId       Int? // null nếu là bot hoặc admin
+  senderType     SenderType // USER, GUEST, BOT, ADMIN
+  message        String     @db.Text
+  metadata       Json? // Lưu thông tin thêm (attachments, reactions...)
+  sessionId      String?
+  isRead         Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@index([sessionId])
+}
+
+model PromptAI {
+  id          Int          @id @default(autoincrement())
+  name        String
+  text        String
+  status      PromptAIStatus
+  position    Int
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status])
+}
+
+enum ChatConversationStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum SenderType {
+  USER
+  GUEST
+  BOT
+  ADMIN
+}
+
 enum DeliveryMethod {
   STANDARD
   XTEAM
 }
-
 
 enum ShippingService {
   STANDARD
@@ -680,7 +746,6 @@ enum ProductStatus {
   DELETED
 }
 
-
 enum CartStatus {
   ACTIVE
   CHECKOUT
@@ -694,6 +759,12 @@ enum CategoryStatus {
 }
 
 enum BrandStatus {
+  ACTIVE
+  INACTIVE
+  DELETED
+}
+
+enum PromptAIStatus {
   ACTIVE
   INACTIVE
   DELETED

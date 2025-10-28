@@ -13,8 +13,10 @@ export class UserResponseDto {
   createdAt: Date;
   updatedAt: Date;
   tenantId?: number;
+  conversationId: number | null;  // Thêm trường conversationId
+  tokenAI?: number;
 
-  constructor(user: User) {
+  constructor(user: User, conversationId: number | null = null) {  // Nhận conversationId từ ngoài
     this.id = user.id;
     this.name = user.name;
     this.email = user.email;
@@ -27,5 +29,7 @@ export class UserResponseDto {
     this.createdAt = user.createdAt;
     this.updatedAt = user.updatedAt;
     this.tenantId = user.tenantId ?? undefined;
+    this.conversationId = conversationId;  // Gán conversationId
+    this.tokenAI = user.tokenAI ?? undefined;
   }
 }

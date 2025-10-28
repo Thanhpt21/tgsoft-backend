@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString } from 'class-validator';
 
 export class UpdateTenantDto {
   @IsOptional()
@@ -12,4 +12,5 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
 }

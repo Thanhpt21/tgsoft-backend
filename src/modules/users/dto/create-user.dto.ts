@@ -38,4 +38,8 @@ export class CreateUserDto {
   @IsOptional()
   @IsNumber()
   tenantId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  tokenAI?: number;
 }

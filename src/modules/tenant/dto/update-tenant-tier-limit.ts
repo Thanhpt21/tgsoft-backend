@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, Min } from 'class-validator';
 
 export class UpdateTenantTierLimitsDto {
   @IsOptional()
@@ -15,4 +15,9 @@ export class UpdateTenantTierLimitsDto {
   @IsInt({ message: 'Giới hạn người dùng đồng thời phải là số nguyên' })
   @Min(1, { message: 'Giới hạn người dùng đồng thời phải lớn hơn 0' })
   maxConcurrentUsers?: number;
+
+  
+  @IsOptional()
+  @IsDateString()
+  expirationDate?: string;
 }

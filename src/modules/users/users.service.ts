@@ -67,70 +67,90 @@ export class UsersService extends TenantAwareService {
   
 
 
-  async getUsers(page = 1, limit = 10, search = '') {
-    const skip = (page - 1) * limit;
+async getUsers(page = 1, limit = 10, search = '') {
+  const skip = (page - 1) * limit;
 
-    const userRole = this.request.user?.role;
-    let where: Prisma.UserWhereInput = {};
+  const userRole = this.request.user?.role;
+  let where: Prisma.UserWhereInput = {};
 
-    if (userRole === 'admin') {
-      where = {
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
-                { email: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
-              ],
-            }
-          : {}),
-      };
-    } else {
-      where = {
-        tenantId: this.tenantId,
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
-                { email: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
-              ],
-            }
-          : {}),
-      };
-    }
-
-    const [users, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          avatar: true,
-          isActive: true,
-          type_account: true,
-          role: true,
-          tenantId: true, 
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-      this.prisma.user.count({ where }),
-    ]);
-
-    return {
-      success: true,
-      message: 'Lấy danh sách người dùng thành công',
-      data: {
-        data: users,
-        total,
-        page,
-        pageCount: Math.ceil(total / limit),
-      },
+  if (userRole === 'admin') {
+    where = {
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
+              { email: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
+            ],
+          }
+        : {}),
+    };
+  } else {
+    where = {
+      tenantId: this.tenantId,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
+              { email: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
+            ],
+          }
+        : {}),
     };
   }
+
+  const [users, total] = await this.prisma.$transaction([
+    this.prisma.user.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        isActive: true,
+        type_account: true,
+        tokenAI: true,
+        role: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
+        // Lấy chatConversations và thêm conversationId
+        chatConversations: {
+          select: {
+            id: true,  // Chỉ lấy ID của cuộc trò chuyện (conversationId)
+          },
+          take: 1,  // Chỉ lấy một cuộc trò chuyện gần nhất, bạn có thể thay đổi nếu cần
+        },
+      },
+    }),
+    this.prisma.user.count({ where }),
+  ]);
+
+  // Xử lý dữ liệu và thêm conversationId vào response
+  const usersWithConversation = users.map((user) => {
+    // Kiểm tra xem người dùng có chatConversations không
+    const conversationId = user.chatConversations.length > 0 ? user.chatConversations[0].id : null;
+    
+    return {
+      ...user,
+      conversationId,  // Thêm conversationId vào dữ liệu user
+    };
+  });
+
+  return {
+    success: true,
+    message: 'Lấy danh sách người dùng thành công',
+    data: {
+      data: usersWithConversation,  // Dữ liệu đã có conversationId
+      total,
+      page,
+      pageCount: Math.ceil(total / limit),
+    },
+  };
+}
+
 
   async getAllUsers(search = '') {
     const userRole = this.request.user?.role;
@@ -170,6 +190,7 @@ export class UsersService extends TenantAwareService {
         email: true,
         avatar: true,
         isActive: true,
+        tokenAI: true,
         type_account: true,
         role: true,
          tenantId: true, 

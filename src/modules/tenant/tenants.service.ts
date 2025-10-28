@@ -158,6 +158,7 @@ export class TenantsService {
         usedAccounts: true,
         usedSKUs: true,
         currentConcurrentUsers: true,
+        expirationDate: true,
       }
     });
 
@@ -191,6 +192,7 @@ export class TenantsService {
         ...(dto.maxAccounts !== undefined && { maxAccounts: dto.maxAccounts }),
         ...(dto.maxSKUs !== undefined && { maxSKUs: dto.maxSKUs }),
         ...(dto.maxConcurrentUsers !== undefined && { maxConcurrentUsers: dto.maxConcurrentUsers }),
+         ...(dto.expirationDate !== undefined && { expirationDate: dto.expirationDate }),
       },
     });
 

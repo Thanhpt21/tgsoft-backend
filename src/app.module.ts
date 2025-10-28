@@ -37,6 +37,9 @@ import { ConfigsModule } from './modules/config/config.module';
 import { BlogModule } from './modules/blog/blog.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { GhtkModule } from './modules/ghtk/ghtk.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { RedisModule } from './core/redis/redis.module';
+import { PromptAIModule } from './modules/promtpAI/promptAI.module';
 
 
 
@@ -77,7 +80,10 @@ import { GhtkModule } from './modules/ghtk/ghtk.module';
     VariantAttributeValuesModule,
     BlogModule,
     ContactModule,
-    GhtkModule
+    GhtkModule,
+    ChatModule,
+    RedisModule,
+    PromptAIModule
   ],
   controllers: [AppController],
    providers: [
@@ -124,6 +130,8 @@ export class AppModule implements NestModule {
       'blogs',
       'contacts',
       'ghtk',
+      'chat',
+      'prompt-ai'
     );
   }
 }

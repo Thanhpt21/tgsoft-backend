@@ -40,4 +40,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsNumber()
   tenantId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  tokenAI?: number;
 }

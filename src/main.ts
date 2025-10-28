@@ -39,6 +39,7 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`✅ Server is running on: http://localhost:${port}/api`);
+  console.log(`🔌 WebSocket server is running on: ws://localhost:${port}/chat`);
 }
 
 bootstrap();

@@ -11,4 +11,5 @@ export class CreateTenantDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+  
 }
