@@ -15,15 +15,10 @@ import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
-    origin: [
-      'http://localhost:3000',     // DEV: Frontend local
-      'https://aiban.vn',          // PROD
-      'https://www.aiban.vn',      // PROD
-    ],
+    origin: process.env.CLIENT_URL,
     credentials: true,
   },
-  path: '/chat',
-  transports: ['websocket'],
+  namespace: '/chat',
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
