@@ -78,6 +78,7 @@ model Tenant {
   configs               Config[]
   blogs                 Blog[]
   chatConversations     ChatConversation[]
+  productReviews        ProductReview[]
 }
 
 model Role {
@@ -267,20 +268,27 @@ model ProductReview {
   id        Int      @id @default(autoincrement())
   productId Int
   userId    Int
-  rating    Int // 1-5
+  rating    Int 
+  orderId     Int?
+  orderItemId Int?
+  isPurchased Boolean  @default(true)
   comment   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  tenantId    Int     
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id])
+  order       Order?   @relation(fields: [orderId], references: [id])
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
 }
 
 model ProductDiscount {
   id        Int      @id @default(autoincrement())
   productId Int
   name      String
-  discount  Float // số tiền giảm hoặc phần trăm (tùy logic)
+  discount  Float 
   isPercent Boolean  @default(false)
   startAt   DateTime
   endAt     DateTime
@@ -372,6 +380,7 @@ model OrderItem {
   warehouse        Warehouse?     @relation(fields: [warehouseId], references: [id])
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  reviews          ProductReview[] @relation
 }
 
 model PaymentMethod {
@@ -636,6 +645,7 @@ model Order {
   shippingFee           Float
   deliveryMethod        DeliveryMethod         @default(STANDARD)
   inventoryUpdated      String?
+  reviews               ProductReview[]        @relation
 }
 
 model ChatConversation {

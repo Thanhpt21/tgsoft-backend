@@ -42,6 +42,15 @@ export class OrdersController {
     return this.ordersService.getOrdersByUser(userId, page, limit);
   }
 
+ @Get('check-purchase/:productId')
+  @UseGuards(JwtAuthGuard)
+  async checkUserPurchasedProduct(
+    @Param('productId', ParseIntPipe) productId: number,
+    @Req() req: any,
+  ) {
+    return this.ordersService.checkUserPurchasedProduct(productId, req.user.id);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async getOne(@Param('id', ParseIntPipe) id: number) {

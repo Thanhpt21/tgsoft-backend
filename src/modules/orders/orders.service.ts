@@ -361,4 +361,60 @@ async updateInventoryFromOrder(orderId: number, newStatus: OrderStatus, action: 
       },
     };
   }
+
+  async checkUserPurchasedProduct(productId: number, userId: number) {
+    const order = await this.prisma.order.findFirst({
+      where: {
+        userId: userId,
+        tenantId: this.tenantId,
+        status: OrderStatus.DELIVERED
+      },
+      include: {
+        items: {
+          where: {
+            productVariant: {
+              productId: productId
+            }
+          },
+          include: {
+            productVariant: {
+              select: {
+                id: true,
+                productId: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc' // Lấy order mới nhất
+      }
+    });
+
+    // Nếu không tìm thấy order hoặc order không có item nào
+    if (!order || !order.items || order.items.length === 0) {
+      return {
+        success: true,
+        data: {
+          hasPurchased: false,
+          orderId: null,
+          orderItemId: null
+        }
+      };
+    }
+
+    // Lấy item đầu tiên (nếu có nhiều lần mua cùng sản phẩm)
+    const firstItem = order.items[0];
+
+    return {
+      success: true,
+      data: {
+        hasPurchased: true,
+        orderId: order.id,
+        orderItemId: firstItem.id,
+        orderStatus: order.status,
+        purchasedAt: order.createdAt
+      }
+    };
+  }
 }
