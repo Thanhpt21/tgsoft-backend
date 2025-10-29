@@ -20,7 +20,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - NODE_ENV=production
-      - CLIENT_URL=http://localhost:3000
+      - CLIENT_URL=https://demo.aiban.vn
     depends_on:
       redis:
         condition: service_healthy
