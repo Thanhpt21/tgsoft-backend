@@ -41,6 +41,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { RedisModule } from './core/redis/redis.module';
 import { PromptAIModule } from './modules/promtpAI/promptAI.module';
 import { ProductReviewModule } from './modules/product-review/product-review.module';
+import { ShippingAddressModule } from './modules/shipping-address/shipping-address.module';
 
 
 
@@ -85,7 +86,8 @@ import { ProductReviewModule } from './modules/product-review/product-review.mod
     ChatModule,
     RedisModule,
     PromptAIModule,
-    ProductReviewModule
+    ProductReviewModule,
+    ShippingAddressModule
   ],
   controllers: [AppController],
    providers: [
@@ -134,7 +136,8 @@ export class AppModule implements NestModule {
       'ghtk',
       'chat',
       'prompt-ai',
-      'product-reviews'
+      'product-reviews',
+      'shipping-addresses'
     );
   }
 }

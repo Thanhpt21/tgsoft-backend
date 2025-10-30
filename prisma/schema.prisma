@@ -39,6 +39,7 @@ model User {
   ProductReview         ProductReview[]
   blogs                 Blog[]
   chatConversations     ChatConversation[]
+  shippingAddresses ShippingAddress[]
 }
 
 model Tenant {
@@ -79,6 +80,7 @@ model Tenant {
   blogs                 Blog[]
   chatConversations     ChatConversation[]
   productReviews        ProductReview[]
+  shippingAddresses     ShippingAddress[]
 }
 
 model Role {
@@ -629,6 +631,7 @@ model Order {
   tenant                Tenant                 @relation(fields: [tenantId], references: [id])
   paymentMethodId       Int?
   paymentMethod         PaymentMethod?         @relation(fields: [paymentMethodId], references: [id])
+  shippingAddressId     Int?     
   items                 OrderItem[]
   payments              Payment[]
   totalAmount           Int
@@ -646,6 +649,7 @@ model Order {
   deliveryMethod        DeliveryMethod         @default(STANDARD)
   inventoryUpdated      String?
   reviews               ProductReview[]        @relation
+  shippingAddress   ShippingAddress? @relation("OrderShippingAddress", fields: [shippingAddressId], references: [id])
 }
 
 model ChatConversation {
@@ -698,6 +702,42 @@ model PromptAI {
   updatedAt   DateTime     @updatedAt
 
   @@index([status])
+}
+
+model ShippingAddress {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int
+  userId      Int?
+
+  name        String
+  phone       String
+  address     String 
+  note        String?
+
+  province_id Int
+  province    String
+  district_id Int
+  district    String
+  ward_id     Int
+  ward        String
+
+  province_name String?
+  district_name String?
+  ward_name     String?
+
+
+  is_default  Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id])
+  orders      Order[]  @relation("OrderShippingAddress")
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([is_default])
 }
 
 enum ChatConversationStatus {

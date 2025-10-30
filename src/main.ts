@@ -13,7 +13,6 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const port = configService.get<number>('PORT');
-  const nodeEnv = configService.get<string>('NODE_ENV');
 
 
   if (!port) {
