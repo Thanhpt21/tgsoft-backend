@@ -22,7 +22,7 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: clientUrl,
+    origin: 'https://demo.aiban.vn',
     methods: 'GET,POST,PUT,DELETE,OPTIONS,PATCH',
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
     credentials: true,

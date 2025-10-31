@@ -1,4 +1,3 @@
-// src/core/redis/redis.module.ts
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
@@ -16,6 +15,13 @@ import Redis from 'ioredis';
           port: redisConfig.port,
           password: redisConfig.password,
           db: redisConfig.db,
+          retryStrategy: (times) => {
+            const delay = Math.min(times * 50, 2000); // Tăng dần thời gian retry
+            return delay;
+          },
+          maxRetriesPerRequest: 100,  // Tăng số lần retry tối đa
+          connectTimeout: 10000, // Thời gian timeout khi kết nối (10s)
+          keepAlive: 60000, // Giữ kết nối sống trong 1 phút
         });
       },
       inject: [ConfigService],
@@ -29,3 +35,4 @@ import Redis from 'ioredis';
   exports: ['REDIS_CLIENT', 'REDIS_TTL'],
 })
 export class RedisModule {}
+
