@@ -28,12 +28,12 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // SERVE UPLOADS – KHÔNG CÓ / CUỐI
-  const uploadsPath = join(process.cwd(), 'uploads');
-  app.useStaticAssets(uploadsPath, {
-    prefix: '/uploads', // ← SỬA: XÓA / CUỐI
+// DÙNG UPLOAD_DIR TỪ .env – LINH HOẠT CHO MỌI MÔI TRƯỜNG
+  const uploadDir = configService.get<string>('UPLOAD_DIR', join(process.cwd(), 'uploads'));
+  app.useStaticAssets(uploadDir, {
+    prefix: '/uploads',
   });
-
+  
   app.setGlobalPrefix('api');
 
   // ===== KHỞI ĐỘNG =====

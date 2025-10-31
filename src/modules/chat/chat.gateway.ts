@@ -15,11 +15,24 @@ import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.CLIENT_URL,
+    // 🔥 FIX: Cho phép cả 2 origins
+    origin: [
+      process.env.CLIENT_URL || 'https://demo.aiban.vn',
+      'https://demo.aiban.vn',
+      'http://localhost:3000', // Dev mode
+    ],
     credentials: true,
+    methods: ['GET', 'POST'],
   },
   namespace: '/chat',
+  // 🔥 FIX: Thêm transports và config production
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
 })
+
+
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
