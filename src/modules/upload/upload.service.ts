@@ -4,31 +4,42 @@ import { join } from 'path';
 import { writeFile, unlink, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UploadService {
-  private readonly uploadDir = '/app/uploads';  // ĐƯỜNG DẪN TRONG CONTAINER
+  constructor(private configService: ConfigService) {}
+
+  private get uploadDir(): string {
+    // ƯU TIÊN: .env → fallback → process.cwd()
+    const envDir = this.configService.get<string>('UPLOAD_DIR');
+    if (envDir) return envDir;
+
+    // Local fallback
+    return join(process.cwd(), 'uploads');
+  }
 
   async uploadLocalImage(file: Express.Multer.File): Promise<string> {
     const filename = `${uuidv4()}-${file.originalname}`;
     const uploadPath = join(this.uploadDir, filename);
 
-    // Tạo thư mục nếu chưa có
     if (!existsSync(this.uploadDir)) {
-      console.log('Creating uploads directory...');
+      console.log('Creating uploads directory at:', this.uploadDir);
       await mkdir(this.uploadDir, { recursive: true });
     }
 
-    // Lưu file
     await writeFile(uploadPath, file.buffer);
+    console.log('Uploaded:', uploadPath);
 
-    return `/uploads/${filename}`;
+    return `uploads/${filename}`;
   }
 
   async deleteLocalImage(relativePath: string): Promise<void> {
     try {
-      const filePath = join(this.uploadDir, relativePath.replace(/^\/uploads\//, ''));
+      const filename = relativePath.replace(/^uploads\//, '');
+      const filePath = join(this.uploadDir, filename);
       await unlink(filePath);
+      console.log('Deleted:', filePath);
     } catch (error) {
       console.error('Delete error:', error);
     }
