@@ -16,11 +16,10 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - .env.prod                 # ĐỔI THÀNH .env.prod
+      - .env.prod                
     environment:
       - REDIS_HOST=redis
       - NODE_ENV=production
-      - CLIENT_URL=https://demo.aiban.vn
     depends_on:
       redis:
         condition: service_healthy

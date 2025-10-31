@@ -52,9 +52,15 @@ export class ProductController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
+    @Query('brandId') brandId?: string,  
+    @Query('categoryId') categoryId?: string, 
+    @Query('sortBy') sortBy: string = 'createdAt_desc',
   ) {
-    return this.productService.getProducts(+page, +limit, search);
+    const brandIdNumber = brandId ? Number(brandId) : undefined;
+    const categoryIdNumber = categoryId ? Number(categoryId) : undefined;
+    return this.productService.getProducts(+page, +limit, search, brandIdNumber, categoryIdNumber, sortBy);
   }
+
 
   @Get('slug/:slug')
   async getProductBySlug(@Param('slug') slug: string) {

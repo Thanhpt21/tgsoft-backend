@@ -53,12 +53,12 @@ async create(userId: number, dto: CreateOrderDto) {
     });
 
     if (!inventory) {
-      throw new BadRequestException(`Không tìm thấy kho cho variant ${item.productVariantId} tại warehouse ${item.warehouseId}`);
+      throw new BadRequestException(`Không tìm thấy sản phẩm này tại kho này`);
     }
 
     if (dto.status && ['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED'].includes(dto.status)) {
       if (inventory.qty < item.quantity) {
-        throw new BadRequestException(`Số lượng tồn kho không đủ cho variant ${item.productVariantId} tại warehouse ${item.warehouseId}`);
+        throw new BadRequestException(`Số lượng tồn kho không đủ tại kho này`);
       }
     }
   }

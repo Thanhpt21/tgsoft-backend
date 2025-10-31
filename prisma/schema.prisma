@@ -592,37 +592,6 @@ model Contact {
   updatedAt DateTime      @updatedAt
 }
 
-enum ContactStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-enum ReceiverType {
-  USER
-  STAFF
-  DISTRIBUTOR
-  VENDOR
-}
-
-enum PayoutStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-enum TransactionType {
-  REVENUE
-  FEE
-  COMMISSION
-  REFUND
-  PAYOUT
-  DISCOUNT
-  ADJUSTMENT
-}
-
 model Order {
   id                    Int                    @id @default(autoincrement())
   userId                Int
@@ -745,6 +714,38 @@ enum ChatConversationStatus {
   CLOSED
   ARCHIVED
 }
+enum ContactStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReceiverType {
+  USER
+  STAFF
+  DISTRIBUTOR
+  VENDOR
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum TransactionType {
+  REVENUE
+  FEE
+  COMMISSION
+  REFUND
+  PAYOUT
+  DISCOUNT
+  ADJUSTMENT
+}
+
+
 
 enum SenderType {
   USER
