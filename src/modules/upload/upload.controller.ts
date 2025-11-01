@@ -1,3 +1,4 @@
+// upload.controller.ts
 import { Controller, Post, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
@@ -6,9 +7,9 @@ import { UploadService } from './upload.service';
 export class UploadController {
   constructor(private uploadService: UploadService) {}
 
-  @Post('avatar')
+  @Post('image') // Đổi endpoint từ 'avatar' thành 'image'
   @UseInterceptors(FileInterceptor('file'))
-  async uploadAvatar(@UploadedFile() file: Express.Multer.File) {
+  async uploadImage(@UploadedFile() file: Express.Multer.File) {
     // Kiểm tra file có tồn tại không
     if (!file) {
       throw new BadRequestException('File không được để trống');

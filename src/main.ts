@@ -2,7 +2,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 
@@ -17,7 +16,6 @@ async function bootstrap() {
     throw new Error('PORT environment variable is not defined.');
   }
 
-  // ===== CẤU HÌNH =====
   app.use(cookieParser());
 
   app.enableCors({
@@ -40,15 +38,9 @@ async function bootstrap() {
     credentials: true,
   });
 
-// DÙNG UPLOAD_DIR TỪ .env – LINH HOẠT CHO MỌI MÔI TRƯỜNG
-  const uploadDir = configService.get<string>('UPLOAD_DIR', join(process.cwd(), 'uploads'));
-  app.useStaticAssets(uploadDir, {
-    prefix: '/uploads',
-  });
-  
   app.setGlobalPrefix('api');
 
-  // ===== KHỞI ĐỘNG =====
+
   await app.listen(port);
 
   console.log(`Server is running on: http://localhost:${port}/api`);
