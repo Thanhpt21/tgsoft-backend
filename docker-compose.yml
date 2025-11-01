@@ -1,4 +1,5 @@
-# docker-compose.yml
+version: '3.8'
+
 services:
   redis:
     image: redis:7-alpine
@@ -16,7 +17,7 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - .env.prod                
+      - .env.prod
     environment:
       - REDIS_HOST=redis
       - NODE_ENV=production
@@ -25,7 +26,5 @@ services:
         condition: service_healthy
     restart: unless-stopped
     volumes:
-      - /root/tgsoft-backend/uploads:/app/uploads
-
-
-
+      # Ánh xạ thư mục uploads trên VPS vào container
+      - /var/www/api.aiban.vn/uploads:/app/uploads

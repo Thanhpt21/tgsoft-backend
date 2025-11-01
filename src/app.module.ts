@@ -92,10 +92,10 @@ import { ShippingAddressModule } from './modules/shipping-address/shipping-addre
   controllers: [AppController],
    providers: [
     AppService,
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: AuditLogInterceptor,
-    },
+    // {
+    //   provide: APP_INTERCEPTOR,
+    //   useClass: AuditLogInterceptor,
+    // },
   ],
 })
 export class AppModule implements NestModule {

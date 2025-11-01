@@ -109,17 +109,19 @@ async getProductBySlug(slug: string) {
 
 async getAllProductsWithSearch(search: string = '') {
   try {
-    const where: any = {};
+    const where: any = {
+      tenantId: this.tenantId, // Lọc theo tenantId
+    };
 
     // Tìm kiếm sản phẩm theo tên hoặc slug
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { slug: { contains: search, mode: 'insensitive' } }
+        { slug: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-    // Lấy tất cả sản phẩm (không lọc theo tenantId)
+    // Lấy tất cả sản phẩm (đã lọc theo tenantId)
     const products = await this.prisma.product.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -135,6 +137,7 @@ async getAllProductsWithSearch(search: string = '') {
     return { success: false, message: 'Lỗi khi truy vấn dữ liệu', error: error.message };
   }
 }
+
 
 
 
