@@ -11,7 +11,6 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const port = configService.get<number>('PORT');
-  const clientUrl = configService.get<string>('CLIENT_URL');
   const nodeEnv = process.env.NODE_ENV || 'development';
 
   if (!port) {
@@ -26,7 +25,8 @@ async function bootstrap() {
       const allowedOrigins = [
         'http://localhost:3000', 
         'http://localhost:3001', 
-        'https://demo.aiban.vn'
+        'https://demo.aiban.vn',
+        'https://db.aiban.vn'
       ];
 
       if (allowedOrigins.includes(origin) || !origin) {
