@@ -25,8 +25,30 @@ export class ConfigService extends TenantAwareService {
       logoUrl = await this.uploadService.uploadLocalImage(file);
     }
 
+    // Hàm helper để parse boolean an toàn
+    const parseBool = (value: any, defaultValue: boolean): boolean => {
+      if (value === 'true' || value === true) return true;
+      if (value === 'false' || value === false) return false;
+      return defaultValue;
+    };
+
     const config = await this.prisma.config.create({
-      data: { ...dto, logo: logoUrl, tenantId: this.tenantId },
+      data: {
+        ...dto,
+        logo: logoUrl,
+        tenantId: this.tenantId,
+        showEmail: parseBool(dto.showEmail, true),
+        showMobile: parseBool(dto.showMobile, true),
+        showAddress: parseBool(dto.showAddress, true),
+        showGooglemap: parseBool(dto.showGooglemap, false),
+        showFacebook: parseBool(dto.showFacebook, true),
+        showZalo: parseBool(dto.showZalo, false),
+        showInstagram: parseBool(dto.showInstagram, false),
+        showTiktok: parseBool(dto.showTiktok, false),
+        showYoutube: parseBool(dto.showYoutube, false),
+        showX: parseBool(dto.showX, false),
+        showLinkedin: parseBool(dto.showLinkedin, false),
+      },
     });
 
     return {
@@ -35,6 +57,7 @@ export class ConfigService extends TenantAwareService {
       data: new ConfigResponseDto(config),
     };
   }
+
 
   async getConfigs(page = 1, limit = 10, search = '') {
     const skip = (page - 1) * limit;
@@ -104,7 +127,9 @@ export class ConfigService extends TenantAwareService {
 
   async update(id: number, dto: UpdateConfigDto, file?: Express.Multer.File) {
     const config = await this.prisma.config.findUnique({ where: { id } });
-    if (!config) return { success: false, message: 'Config không tồn tại' };
+    if (!config) {
+      return { success: false, message: 'Config không tồn tại' };
+    }
 
     let logoUrl = config.logo;
     if (file) {
@@ -114,9 +139,32 @@ export class ConfigService extends TenantAwareService {
       logoUrl = await this.uploadService.uploadLocalImage(file);
     }
 
+    // Hàm helper parse boolean
+    const parseBool = (value: any): boolean | undefined => {
+      if (value === 'true' || value === true) return true;
+      if (value === 'false' || value === false) return false;
+      return value;
+    };
+
+    // Parse các field boolean
+    const parsedDto = {
+      ...dto,
+      showEmail: parseBool(dto.showEmail),
+      showMobile: parseBool(dto.showMobile),
+      showAddress: parseBool(dto.showAddress),
+      showGooglemap: parseBool(dto.showGooglemap),
+      showFacebook: parseBool(dto.showFacebook),
+      showZalo: parseBool(dto.showZalo),
+      showInstagram: parseBool(dto.showInstagram),
+      showTiktok: parseBool(dto.showTiktok),
+      showYoutube: parseBool(dto.showYoutube),
+      showX: parseBool(dto.showX),
+      showLinkedin: parseBool(dto.showLinkedin),
+    };
+
     const updated = await this.prisma.config.update({
       where: { id },
-      data: { ...dto, logo: logoUrl },
+      data: { ...parsedDto, logo: logoUrl },
     });
 
     return {
@@ -125,6 +173,7 @@ export class ConfigService extends TenantAwareService {
       data: new ConfigResponseDto(updated),
     };
   }
+
 
   async delete(id: number) {
     const config = await this.prisma.config.findUnique({ where: { id } });

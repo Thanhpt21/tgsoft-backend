@@ -19,7 +19,7 @@ import Redis from 'ioredis';
             const delay = Math.min(times * 50, 2000); // Tăng dần thời gian retry
             return delay;
           },
-          maxRetriesPerRequest: 100,  // Tăng số lần retry tối đa
+          maxRetriesPerRequest: null,  // Tăng số lần retry tối đa
           connectTimeout: 10000, // Thời gian timeout khi kết nối (10s)
           keepAlive: 60000, // Giữ kết nối sống trong 1 phút
         });

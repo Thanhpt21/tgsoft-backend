@@ -60,6 +60,33 @@ export class ProductController {
     const categoryIdNumber = categoryId ? Number(categoryId) : undefined;
     return this.productService.getProducts(+page, +limit, search, brandIdNumber, categoryIdNumber, sortBy);
   }
+ 
+  @Get('promoted')
+  async getPromotedProducts(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+    @Query('brandId') brandId?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    const brandIdNumber = brandId ? Number(brandId) : undefined;
+    const categoryIdNumber = categoryId ? Number(categoryId) : undefined;
+    return this.productService.getPromotedProductsWithSearch(+page, +limit, search, brandIdNumber, categoryIdNumber);
+  }
+
+   
+ @Get('non-promoted')
+  async getNonPromotedProducts(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+    @Query('brandId') brandId?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    const brandIdNumber = brandId ? Number(brandId) : undefined;
+    const categoryIdNumber = categoryId ? Number(categoryId) : undefined;
+    return this.productService.getNonPromotedProductsWithSearch(+page, +limit, search, brandIdNumber, categoryIdNumber);
+  }
 
 
   @Get('slug/:slug')
@@ -73,6 +100,15 @@ export class ProductController {
   ) {
     return this.productService.getAllProductsWithSearch(search);
   }
+
+    @Get('all/tenant')
+    @UseGuards(JwtAuthGuard) // Vẫn cần login
+    async getAllProductsByTenant(
+      @Query('tenantId') overrideTenantId?: string,
+    ) {
+      const tenantId = overrideTenantId ? Number(overrideTenantId) : undefined;
+      return this.productService.getAllProductsByTenantId(tenantId);
+    }
 
 
 
@@ -113,4 +149,6 @@ export class ProductController {
   async deleteProduct(@Param('id', ParseIntPipe) id: number) {
     return this.productService.deleteProduct(id);
   }
+
+
 }

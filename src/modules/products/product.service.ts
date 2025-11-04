@@ -138,11 +138,7 @@ async getAllProductsWithSearch(search: string = '') {
   }
 }
 
-
-
-
-
-async getProducts(
+async getPromotedProductsWithSearch(
   page = 1,
   limit = 10,
   search = '',
@@ -152,14 +148,26 @@ async getProducts(
 ) {
   const skip = (page - 1) * limit;
 
-  // Điều kiện lọc cơ bản theo tenantId
-  const where: Prisma.ProductWhereInput = { tenantId: this.tenantId };
+  // Điều kiện lọc cơ bản theo tenantId và sản phẩm có khuyến mãi
+  const where: Prisma.ProductWhereInput = {
+    tenantId: this.tenantId,
+    promotionProducts: {
+      some: {
+        promotion: {
+          status: { in: ['ACTIVE', 'SCHEDULED'] },
+          startTime: { lte: new Date() },
+          endTime: { gte: new Date() },
+        },
+      },
+    },
+  };
 
   // Điều kiện tìm kiếm theo tên sản phẩm (nếu có)
   if (search) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
       { slug: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } }, // Tìm kiếm theo mô tả
     ];
   }
 
@@ -195,7 +203,106 @@ async getProducts(
   // Truy vấn sản phẩm và đếm tổng số sản phẩm
   const [products, total] = await this.prisma.$transaction([
     this.prisma.product.findMany({
-      where,  // Sử dụng điều kiện where đã lọc
+      where,
+      skip,   // Phân trang
+      take: limit, // Giới hạn số lượng sản phẩm trả về
+      orderBy,  // Sắp xếp theo điều kiện
+      include: {
+        promotionProducts: {
+          where: {
+            promotion: {
+              status: 'ACTIVE',
+              startTime: { lte: new Date() },
+              endTime: { gte: new Date() },
+            },
+          },
+          include: {
+            promotion: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        attributes: { include: { attribute: true } },
+      },
+    }),
+    this.prisma.product.count({ where }),  // Đếm tổng số sản phẩm thỏa mãn điều kiện
+  ]);
+
+  // Trả về dữ liệu
+  return {
+    success: true,
+    message: 'Lấy danh sách sản phẩm có khuyến mãi thành công',
+    data: {
+      data: products.map((p) => new ProductResponseDto(p)),
+      total,
+      page,
+      pageCount: Math.ceil(total / limit),  // Tính số trang
+    },
+  };
+}
+async getNonPromotedProductsWithSearch(
+  page = 1,
+  limit = 10,
+  search = '',
+  brandId?: number,
+  categoryId?: number,
+  sortBy = 'createdAt_desc' // Thêm sortBy
+) {
+  const skip = (page - 1) * limit;
+
+  // Điều kiện lọc cơ bản theo tenantId và sản phẩm không có khuyến mãi
+  const where: Prisma.ProductWhereInput = {
+    tenantId: this.tenantId,
+    promotionProducts: {
+      none: {}, // Không có khuyến mãi nào gắn với sản phẩm
+    },
+  };
+
+  // Điều kiện tìm kiếm theo tên sản phẩm (nếu có)
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { slug: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } }, // Tìm kiếm theo mô tả
+    ];
+  }
+
+  // Điều kiện lọc theo brandId (nếu có)
+  if (brandId) {
+    where.brandId = brandId;
+  }
+
+  // Điều kiện lọc theo categoryId (nếu có)
+  if (categoryId) {
+    where.categoryId = categoryId;
+  }
+
+  // Xử lý các điều kiện sắp xếp (sortBy)
+  let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' }; // Mặc định là sắp xếp theo createdAt
+
+  switch (sortBy) {
+    case 'price_asc':
+      orderBy = { basePrice: 'asc' }; // Sắp xếp theo giá từ thấp đến cao
+      break;
+    case 'price_desc':
+      orderBy = { basePrice: 'desc' }; // Sắp xếp theo giá từ cao xuống thấp
+      break;
+    case 'createdAt_asc':
+      orderBy = { createdAt: 'asc' }; // Sắp xếp theo ngày tạo từ cũ đến mới
+      break;
+    case 'createdAt_desc':
+    default:
+      orderBy = { createdAt: 'desc' }; // Mặc định là sắp xếp theo ngày tạo mới nhất
+      break;
+  }
+
+  // Truy vấn sản phẩm và đếm tổng số sản phẩm
+  const [products, total] = await this.prisma.$transaction([
+    this.prisma.product.findMany({
+      where,
       skip,   // Phân trang
       take: limit, // Giới hạn số lượng sản phẩm trả về
       orderBy,  // Sắp xếp theo điều kiện
@@ -207,12 +314,120 @@ async getProducts(
   // Trả về dữ liệu
   return {
     success: true,
-    message: 'Lấy danh sách sản phẩm thành công',
+    message: 'Lấy danh sách sản phẩm không có khuyến mãi thành công',
     data: {
       data: products.map((p) => new ProductResponseDto(p)),
       total,
       page,
       pageCount: Math.ceil(total / limit),  // Tính số trang
+    },
+  };
+}
+
+async getProducts(
+  page = 1,
+  limit = 10,
+  search = '',
+  brandId?: number,
+  categoryId?: number,
+  sortBy = 'createdAt_desc'
+) {
+  const skip = (page - 1) * limit;
+
+  // Điều kiện lọc cơ bản theo tenantId
+  const where: Prisma.ProductWhereInput = {
+    tenantId: this.tenantId,
+  };
+
+  // Tìm kiếm theo tên, slug, mô tả
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { slug: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } }, // Thêm mô tả
+    ];
+  }
+
+  // Lọc theo brandId
+  if (brandId) {
+    where.brandId = brandId;
+  }
+
+  // Lọc theo categoryId
+  if (categoryId) {
+    where.categoryId = categoryId;
+  }
+
+  // Xử lý sắp xếp
+  let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
+
+  switch (sortBy) {
+    case 'price_asc':
+      orderBy = { basePrice: 'asc' };
+      break;
+    case 'price_desc':
+      orderBy = { basePrice: 'desc' };
+      break;
+    case 'createdAt_asc':
+      orderBy = { createdAt: 'asc' };
+      break;
+    case 'createdAt_desc':
+    default:
+      orderBy = { createdAt: 'desc' };
+      break;
+  }
+
+  // Truy vấn sản phẩm + đếm
+  const [products, total] = await this.prisma.$transaction([
+    this.prisma.product.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      include: {
+        // Lấy attributes
+        attributes: {
+          include: { attribute: true },
+        },
+        // Lấy promotionProducts nếu đang ACTIVE/SCHEDULED và trong thời gian
+        promotionProducts: {
+          where: {
+            promotion: {
+              status: { in: ['ACTIVE', 'SCHEDULED'] },
+              startTime: { lte: new Date() },
+              endTime: { gte: new Date() },
+            },
+          },
+          include: {
+            promotion: {
+              select: {
+                id: true,
+                name: true,
+                isFlashSale: true, // Nếu cần
+              },
+            },
+            giftProduct: {
+              select: {
+                id: true,
+                name: true,
+                thumb: true,
+              },
+            },
+          },
+        },
+      },
+    }),
+    this.prisma.product.count({ where }),
+  ]);
+
+  return {
+    success: true,
+    message: 'Lấy danh sách sản phẩm thành công',
+    data: {
+      data: products.map((p) => new ProductResponseDto(p)),
+      total,
+      page,
+      pageCount: Math.ceil(total / limit),
     },
   };
 }
@@ -336,5 +551,36 @@ async updateProduct(
       message: 'Xóa product thành công',
     };
   }
+
+  async getAllProductsByTenantId(overrideTenantId?: number) {
+  const tenantId = overrideTenantId ?? this.tenantId;
+
+  try {
+    const products = await this.prisma.product.findMany({
+      where: {
+        tenantId,
+      },
+      include: {
+        attributes: {
+          include: { attribute: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      success: true,
+      message: 'Lấy tất cả sản phẩm thành công',
+      data: products.map(p => new ProductResponseDto(p)),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Lỗi khi lấy danh sách sản phẩm',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+  }
+
 }
 

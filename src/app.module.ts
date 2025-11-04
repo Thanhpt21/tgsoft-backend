@@ -42,6 +42,8 @@ import { RedisModule } from './core/redis/redis.module';
 import { PromptAIModule } from './modules/promtpAI/promptAI.module';
 import { ProductReviewModule } from './modules/product-review/product-review.module';
 import { ShippingAddressModule } from './modules/shipping-address/shipping-address.module';
+import { PromotionModule } from './modules/promotion/promotion.module';
+import { PromotionProductModule } from './modules/promotion-product/promotion-product.module';
 
 
 
@@ -87,7 +89,9 @@ import { ShippingAddressModule } from './modules/shipping-address/shipping-addre
     RedisModule,
     PromptAIModule,
     ProductReviewModule,
-    ShippingAddressModule
+    ShippingAddressModule,
+    PromotionModule,
+    PromotionProductModule
   ],
   controllers: [AppController],
    providers: [
@@ -137,7 +141,9 @@ export class AppModule implements NestModule {
       'chat',
       'prompt-ai',
       'product-reviews',
-      'shipping-addresses'
+      'shipping-addresses',
+      'promotions',
+      'promotion-products',
     );
   }
 }

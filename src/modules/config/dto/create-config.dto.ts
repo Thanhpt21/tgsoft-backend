@@ -1,4 +1,5 @@
-import { IsString, IsOptional } from 'class-validator';
+// src/config/dto/create-config.dto.ts
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateConfigDto {
   @IsOptional()
@@ -48,4 +49,48 @@ export class CreateConfigDto {
   @IsOptional()
   @IsString()
   linkedin?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  showEmail?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showMobile?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showAddress?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showGooglemap?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showFacebook?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showZalo?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showInstagram?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showTiktok?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showYoutube?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showX?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showLinkedin?: boolean;
 }
