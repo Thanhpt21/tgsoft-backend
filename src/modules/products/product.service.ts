@@ -91,9 +91,41 @@ async create(dto: CreateProductDto, userId: number, thumb?: Express.Multer.File,
 }
 
 async getProductBySlug(slug: string) {
+  const now = new Date();
+
   const product = await this.prisma.product.findFirst({
-    where: { slug, tenantId: this.tenantId },
-    include: { attributes: { include: { attribute: true } } },
+    where: {
+      slug,
+      tenantId: this.tenantId,
+    },
+    include: {
+      attributes: {
+        include: { attribute: true },
+      },
+      promotionProducts: {
+        where: {
+          promotion: {
+            AND: [
+              { status: { in: ['ACTIVE', 'SCHEDULED'] } },
+              { startTime: { lte: now } },
+              { endTime: { gte: now } },
+            ],
+          },
+        },
+        include: {
+          promotion: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              startTime: true,
+              endTime: true,
+            },
+          },
+          giftProduct: true, // Nếu cần thông tin quà tặng
+        },
+      },
+    },
   });
 
   if (!product) {
@@ -102,7 +134,7 @@ async getProductBySlug(slug: string) {
 
   return {
     success: true,
-    message: 'Lấy product thành công',
+    message: 'Lấy sản phẩm và khuyến mãi thành công',
     data: new ProductResponseDto(product),
   };
 }

@@ -19,25 +19,30 @@ export class CartService extends TenantAwareService {
   }
 
 
-  async getCartByUser(userId: number) {
-    return this.prisma.cart.findFirst({
-      where: { 
-        userId: userId,
-        tenantId: this.tenantId,
-      },
-      include: {
-        items: {
-          include: {
-            variant: {
-              include: {
-                product: true, // Include thông tin product
+async getCartByUser(userId: number) {
+  return this.prisma.cart.findFirst({
+    where: { 
+      userId: userId,
+      tenantId: this.tenantId,
+    },
+    include: {
+      items: {
+        include: {
+          variant: {
+            include: {
+              product: {
+                include: {
+                  promotionProducts: true, // Bao gồm promotionProducts từ product
+                },
               },
             },
           },
         },
       },
-    });
-  }
+    },
+  });
+}
+
 
 
   async addItemToCart(userId: number, dto: AddCartItemDto) {
