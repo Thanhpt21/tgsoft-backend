@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  //directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -336,10 +336,13 @@ model OrderItem {
   warehouseId      Int?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+  giftProductId    Int?     
+  giftQuantity     Int?            @default(0)
   order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productVariant   ProductVariant  @relation(fields: [productVariantId], references: [id])
   warehouse        Warehouse?      @relation(fields: [warehouseId], references: [id])
   reviews          ProductReview[]
+  @@index([giftProductId])
 }
 
 model PaymentMethod {

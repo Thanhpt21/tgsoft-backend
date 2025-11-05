@@ -103,26 +103,9 @@ async getProductBySlug(slug: string) {
         include: { attribute: true },
       },
       promotionProducts: {
-        where: {
-          promotion: {
-            AND: [
-              { status: { in: ['ACTIVE', 'SCHEDULED'] } },
-              { startTime: { lte: now } },
-              { endTime: { gte: now } },
-            ],
-          },
-        },
         include: {
-          promotion: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              startTime: true,
-              endTime: true,
-            },
-          },
-          giftProduct: true, // Nếu cần thông tin quà tặng
+          promotion: true,
+          giftProduct: true,
         },
       },
     },
@@ -132,10 +115,23 @@ async getProductBySlug(slug: string) {
     return { success: false, message: 'Product không tồn tại' };
   }
 
+  // Lọc promotion hợp lệ: chỉ ACTIVE và trong khoảng thời gian
+  const validPromotions = product.promotionProducts.filter((pp) => {
+    const promo = pp.promotion;
+    return (
+      promo.status === 'ACTIVE' &&
+      promo.startTime <= now &&
+      promo.endTime >= now
+    );
+  });
+
   return {
     success: true,
     message: 'Lấy sản phẩm và khuyến mãi thành công',
-    data: new ProductResponseDto(product),
+    data: {
+      ...new ProductResponseDto(product),
+      promotionProducts: validPromotions,
+    },
   };
 }
 
@@ -465,20 +461,44 @@ async getProducts(
 }
 
 
-  async getProductById(id: number) {
-    const product = await this.prisma.product.findFirst({
-      where: { id, tenantId: this.tenantId },
-      include: { attributes: { include: { attribute: true } } },
-    });
-    if (!product)
-      return { success: false, message: 'Product không tồn tại trong tenant' };
+async getProductById(id: number) {
+  const product = await this.prisma.product.findFirst({
+    where: { id, tenantId: this.tenantId },
+    include: {
+      attributes: { include: { attribute: true } },
+      promotionProducts: {
+        include: { promotion: true },
+      },
+    },
+  });
 
-    return {
-      success: true,
-      message: 'Lấy product thành công',
-      data: new ProductResponseDto(product),
-    };
-  }
+  if (!product)
+    return { success: false, message: 'Product không tồn tại trong tenant' };
+
+  const now = new Date();
+
+  // Lọc promotion hợp lệ: chỉ lấy ACTIVE và trong khoảng thời gian
+  const validPromotions = product.promotionProducts.filter((pp) => {
+    const promo = pp.promotion;
+    return (
+      promo.status === 'ACTIVE' &&
+      promo.startTime <= now &&
+      promo.endTime >= now
+    );
+  });
+
+  // Trả về product với promotion đã lọc
+  return {
+    success: true,
+    message: 'Lấy product thành công',
+    data: {
+      ...new ProductResponseDto(product),
+      promotionProducts: validPromotions,
+    },
+  };
+}
+
+
 
 async updateProduct(
   id: number,

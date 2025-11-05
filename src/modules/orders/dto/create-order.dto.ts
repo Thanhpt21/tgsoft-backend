@@ -27,6 +27,14 @@ class OrderItemDto {
   @IsOptional()
   @IsNumber()
   warehouseId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  giftProductId?: number | null;  // null nếu không có quà
+
+  @IsOptional()
+  @IsNumber()
+  giftQuantity?: number;          // default 0 nếu không gửi
 }
 
 class ShippingInfoDto {

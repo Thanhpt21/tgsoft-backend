@@ -31,6 +31,7 @@ async create(userId: number, dto: CreateOrderDto) {
     throw new BadRequestException('Thiếu thông tin items');
   }
 
+
   // Kiểm tra variant tồn tại và đủ kho
   for (const item of dto.items) {
     const variant = await this.prisma.productVariant.findUnique({
@@ -96,6 +97,8 @@ async create(userId: number, dto: CreateOrderDto) {
       unitPrice: item.unitPrice,
       sku: item.sku ?? '',
       warehouseId: item.warehouseId, // Lưu warehouseId
+      giftProductId: item.giftProductId ?? null,
+      giftQuantity: item.giftQuantity ?? 0,
     })),
   });
 

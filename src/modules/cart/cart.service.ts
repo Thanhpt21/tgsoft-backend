@@ -20,7 +20,9 @@ export class CartService extends TenantAwareService {
 
 
 async getCartByUser(userId: number) {
-  return this.prisma.cart.findFirst({
+  const now = new Date(); // Thời gian hiện tại
+
+  const cart = await this.prisma.cart.findFirst({
     where: { 
       userId: userId,
       tenantId: this.tenantId,
@@ -32,7 +34,11 @@ async getCartByUser(userId: number) {
             include: {
               product: {
                 include: {
-                  promotionProducts: true, // Bao gồm promotionProducts từ product
+                  promotionProducts: {
+                    include: {
+                      promotion: true, // Bao gồm thông tin về promotion
+                    },
+                  },
                 },
               },
             },
@@ -41,7 +47,39 @@ async getCartByUser(userId: number) {
       },
     },
   });
+
+  if (!cart) {
+    return null; // Trường hợp không tìm thấy giỏ hàng
+  }
+
+  // Duyệt qua các items trong giỏ hàng và lọc ra các promotion hợp lệ
+  cart.items = cart.items.map(item => {
+    const product = item.variant.product; // Lấy thông tin sản phẩm
+    let basePrice = item.variant.price || item.variant.priceDelta || 0; // Giá cơ bản
+
+    // Lọc ra các promotion hợp lệ (trạng thái 'ACTIVE' và thời gian còn hiệu lực)
+    const validPromotions = product.promotionProducts.filter(pp => {
+      const promo = pp.promotion;
+      return promo.status === 'ACTIVE' && promo.startTime <= now && promo.endTime >= now;
+    });
+
+    // Nếu không có khuyến mãi hợp lệ, set promotions rỗng
+    if (validPromotions.length === 0) {
+      product.promotionProducts = [];
+    } else {
+      product.promotionProducts = validPromotions;
+    }
+
+   
+    // Trả về item đã cập nhật mà không cần finalPrice
+    return {
+      ...item,
+    };
+  });
+
+  return cart;
 }
+
 
 
 

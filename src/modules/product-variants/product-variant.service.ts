@@ -52,18 +52,48 @@ export class ProductVariantService extends TenantAwareService {
     };
   }
 
-  async getByProduct(productId: number) {
-    const variants = await this.prisma.productVariant.findMany({
-      where: { productId },
-      orderBy: { createdAt: 'desc' },
+async getByProduct(productId: number) {
+  const now = new Date();
+
+  const variants = await this.prisma.productVariant.findMany({
+    where: { productId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      product: {
+        include: {
+          promotionProducts: {
+            include: { promotion: true, giftProduct: true },
+          },
+        },
+      },
+    },
+  });
+
+  const variantsWithValidPromotions = variants.map((v) => {
+    const validPromotions = v.product.promotionProducts.filter((pp) => {
+      const promo = pp.promotion;
+      return promo.status === 'ACTIVE' && promo.startTime <= now && promo.endTime >= now;
     });
 
     return {
-      success: true,
-      message: 'Lấy variants thành công',
-      data: variants.map((v) => new ProductVariantResponseDto(v)),
+      ...v,
+      product: {
+        ...v.product,
+        promotionProducts: validPromotions,
+      },
     };
-  }
+  });
+
+  return {
+    success: true,
+    message: 'Lấy variants thành công',
+    data: variantsWithValidPromotions,
+  };
+}
+
+
+
+
 
   async update(
     id: number,
