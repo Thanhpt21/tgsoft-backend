@@ -508,8 +508,10 @@ model Config {
   x             String?
   linkedin      String?
   logo          String?
+  banner        Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
   showAddress   Boolean  @default(true)
   showEmail     Boolean  @default(true)
   showFacebook  Boolean  @default(true)
@@ -521,8 +523,18 @@ model Config {
   showX         Boolean  @default(false)
   showYoutube   Boolean  @default(false)
   showZalo      Boolean  @default(false)
+
+  VNP_TMN_CODE  String?
+  VNP_SECRET    String?
+  VNP_API_URL   String?
+
+  EMAIL_USER    String?
+  EMAIL_PASS    String?
+  EMAIL_FROM    String?
+
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
 }
+
 
 model Blog {
   id          Int      @id @default(autoincrement())

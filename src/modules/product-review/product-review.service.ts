@@ -50,7 +50,7 @@ export class ProductReviewService extends TenantAwareService {
     const order = await this.prisma.order.findFirst({
       where: { 
         id: dto.orderId, 
-        userId: userId, // ← Quan trọng: đảm bảo order thuộc về user
+        userId: userId, 
         tenantId: this.tenantId 
       },
     });
@@ -65,17 +65,15 @@ export class ProductReviewService extends TenantAwareService {
     const orderItem = await this.prisma.orderItem.findFirst({
       where: { 
         id: dto.orderItemId,
-        orderId: dto.orderId, // ← Đảm bảo orderItem thuộc đơn hàng
+        orderId: dto.orderId,
       },
       include: {
         productVariant: {
-          select: {
-            productId: true,
-          }
+          select: { productId: true },
         }
       }
     });
-    
+
     if (!orderItem) {
       return { 
         success: false, 
@@ -91,7 +89,7 @@ export class ProductReviewService extends TenantAwareService {
       };
     }
 
-    // 7. Kiểm tra trạng thái đơn hàng (chỉ cho đánh giá khi đã giao hàng thành công)
+    // 7. Kiểm tra trạng thái đơn hàng
     if (order.status !== 'DELIVERED') {
       return { 
         success: false, 
@@ -108,18 +106,39 @@ export class ProductReviewService extends TenantAwareService {
       };
     }
 
-    // 9. Tạo đánh giá
-    const review = await this.prisma.productReview.create({
-      data: {
-        productId: dto.productId,
-        userId: userId,
-        rating: rating,
-        orderId: dto.orderId,
-        orderItemId: dto.orderItemId,
-        isPurchased: true, // ← Luôn true vì đã kiểm tra order
-        comment: dto.comment || null,
-        tenantId: this.tenantId,
-      },
+    // 9. Tạo review và cập nhật Product trong một transaction
+    const review = await this.prisma.$transaction(async (tx) => {
+      // Tạo review
+      const newReview = await tx.productReview.create({
+        data: {
+          productId: dto.productId,
+          userId: userId,
+          rating: rating,
+          orderId: dto.orderId,
+          orderItemId: dto.orderItemId,
+          isPurchased: true,
+          comment: dto.comment || null,
+          tenantId: this.tenantId,
+        },
+      });
+
+      // Lấy tổng số reviews và tổng ratings hiện tại
+      const agg = await tx.productReview.aggregate({
+        where: { productId: dto.productId, tenantId: this.tenantId },
+        _count: { id: true },
+        _avg: { rating: true },
+      });
+
+      // Cập nhật sản phẩm
+      await tx.product.update({
+        where: { id: dto.productId },
+        data: {
+          totalReviews: agg._count.id,
+          totalRatings: agg._avg.rating || 0,
+        },
+      });
+
+      return newReview;
     });
 
     return {
@@ -196,6 +215,8 @@ export class ProductReviewService extends TenantAwareService {
     }
 
     // Kiểm tra tính hợp lệ của productId, orderId, orderItemId nếu được cập nhật
+    let productId = review.productId;
+
     if (dto.productId && dto.productId !== review.productId) {
       const product = await this.prisma.product.findFirst({
         where: { id: dto.productId, tenantId: this.tenantId },
@@ -203,7 +224,9 @@ export class ProductReviewService extends TenantAwareService {
       if (!product) {
         return { success: false, message: 'Sản phẩm không tồn tại trong tenant' };
       }
+      productId = dto.productId;
     }
+
     if (dto.orderId && dto.orderId !== review.orderId) {
       const order = await this.prisma.order.findFirst({
         where: { id: dto.orderId, tenantId: this.tenantId },
@@ -212,6 +235,7 @@ export class ProductReviewService extends TenantAwareService {
         return { success: false, message: 'Đơn hàng không tồn tại trong tenant' };
       }
     }
+
     if (dto.orderItemId && dto.orderItemId !== review.orderItemId) {
       const orderItem = await this.prisma.orderItem.findFirst({
         where: { id: dto.orderItemId },
@@ -221,24 +245,44 @@ export class ProductReviewService extends TenantAwareService {
       }
     }
 
-    // Cập nhật đánh giá
-    const updated = await this.prisma.productReview.update({
-      where: { id },
-      data: {
-        productId: dto.productId ?? review.productId,
-        userId: dto.userId ?? review.userId,
-        rating: dto.rating !== undefined ? ValidationHelper.parseNumber(dto.rating) ?? review.rating : review.rating,
-        orderId: dto.orderId !== undefined ? ValidationHelper.parseInt(dto.orderId) : review.orderId,
-        orderItemId: dto.orderItemId !== undefined ? ValidationHelper.parseInt(dto.orderItemId) : review.orderItemId,
-        isPurchased: dto.isPurchased !== undefined ? ValidationHelper.parseBoolean(dto.isPurchased) : review.isPurchased,
-        comment: dto.comment ?? review.comment,
-      },
+    // Transaction: update review và cập nhật tổng rating cho sản phẩm
+    const updatedReview = await this.prisma.$transaction(async (tx) => {
+      // 1. Cập nhật review
+      const updated = await tx.productReview.update({
+        where: { id },
+        data: {
+          productId: productId,
+          rating: dto.rating !== undefined ? ValidationHelper.parseNumber(dto.rating) ?? review.rating : review.rating,
+          orderId: dto.orderId ?? review.orderId,
+          orderItemId: dto.orderItemId ?? review.orderItemId,
+          isPurchased: dto.isPurchased !== undefined ? ValidationHelper.parseBoolean(dto.isPurchased) : review.isPurchased,
+          comment: dto.comment ?? review.comment,
+        },
+      });
+
+      // 2. Tính lại tổng số reviews và trung bình rating
+      const agg = await tx.productReview.aggregate({
+        where: { productId: productId, tenantId: this.tenantId },
+        _count: { id: true },
+        _avg: { rating: true },
+      });
+
+      // 3. Cập nhật product
+      await tx.product.update({
+        where: { id: productId },
+        data: {
+          totalReviews: agg._count.id,
+          totalRatings: agg._avg.rating || 0,
+        },
+      });
+
+      return updated;
     });
 
     return {
       success: true,
       message: 'Cập nhật đánh giá sản phẩm thành công',
-      data: new ProductReviewResponseDto(updated),
+      data: new ProductReviewResponseDto(updatedReview),
     };
   }
 

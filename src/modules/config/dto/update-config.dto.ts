@@ -1,5 +1,5 @@
 // src/config/dto/update-config.dto.ts
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsArray } from 'class-validator';
 
 export class UpdateConfigDto {
   @IsOptional()
@@ -51,6 +51,15 @@ export class UpdateConfigDto {
   linkedin?: string;
 
   @IsOptional()
+  @IsString()
+  logo?: string;
+
+  @IsOptional()
+  @IsArray()
+  banner?: string[];
+
+  // --- Các cờ hiển thị ---
+  @IsOptional()
   @IsBoolean()
   showEmail?: boolean;
 
@@ -93,4 +102,30 @@ export class UpdateConfigDto {
   @IsOptional()
   @IsBoolean()
   showLinkedin?: boolean;
+
+  // --- Cấu hình VNPAY ---
+  @IsOptional()
+  @IsString()
+  VNP_TMN_CODE?: string;
+
+  @IsOptional()
+  @IsString()
+  VNP_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  VNP_API_URL?: string;
+
+  // --- Cấu hình Email ---
+  @IsOptional()
+  @IsString()
+  EMAIL_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  EMAIL_PASS?: string;
+
+  @IsOptional()
+  @IsString()
+  EMAIL_FROM?: string;
 }

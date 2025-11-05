@@ -1,5 +1,5 @@
 // src/config/dto/create-config.dto.ts
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsArray } from 'class-validator';
 
 export class CreateConfigDto {
   @IsOptional()
@@ -51,6 +51,16 @@ export class CreateConfigDto {
   linkedin?: string;
 
   @IsOptional()
+  @IsString()
+  logo?: string;
+
+  // banner là danh sách URL ảnh → dùng IsArray
+  @IsOptional()
+  @IsArray()
+  banner?: string[];
+
+  // --- Các cờ hiển thị ---
+  @IsOptional()
   @IsBoolean()
   showEmail?: boolean;
 
@@ -93,4 +103,30 @@ export class CreateConfigDto {
   @IsOptional()
   @IsBoolean()
   showLinkedin?: boolean;
+
+  // --- Cấu hình VNPAY ---
+  @IsOptional()
+  @IsString()
+  VNP_TMN_CODE?: string;
+
+  @IsOptional()
+  @IsString()
+  VNP_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  VNP_API_URL?: string;
+
+  // --- Cấu hình Email ---
+  @IsOptional()
+  @IsString()
+  EMAIL_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  EMAIL_PASS?: string;
+
+  @IsOptional()
+  @IsString()
+  EMAIL_FROM?: string;
 }

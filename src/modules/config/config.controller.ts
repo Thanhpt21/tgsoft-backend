@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseInterceptors, UploadedFile, UseGuards, Query } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseInterceptors, UploadedFile, UseGuards, Query, UploadedFiles } from '@nestjs/common';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from './config.service';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { UpdateConfigDto } from './dto/update-config.dto';
@@ -14,9 +14,20 @@ export class ConfigController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Post()
   @Permissions('create_configs')
-  @UseInterceptors(FileInterceptor('logo'))
-  async create(@Body() dto: CreateConfigDto, @UploadedFile() file?: Express.Multer.File) {
-    return this.configService.create(dto, file);
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'logo', maxCount: 1 },      // 1 file logo
+      { name: 'banner', maxCount: 10 },   // tối đa 10 file banner
+    ])
+  )
+  async create(
+    @Body() dto: CreateConfigDto,
+    @UploadedFiles() files: { logo?: Express.Multer.File[]; banner?: Express.Multer.File[] }
+  ) {
+    const logoFile = files.logo?.[0];
+    const bannerFiles = files.banner || [];
+    
+    return this.configService.create(dto, logoFile, bannerFiles);
   }
 
   @Get()
@@ -27,6 +38,11 @@ export class ConfigController {
   ) {
     return this.configService.getConfigs(Number(page), Number(limit), search);
   }
+
+   @Get('tenant/:tenantId')
+    async getByTenantId(@Param('tenantId') tenantId: string) {
+      return this.configService.getByTenantId(tenantId);
+    }
   
   @Get(':id')
   async getById(@Param('id', ParseIntPipe) id: number) {
@@ -36,10 +52,22 @@ export class ConfigController {
   @Put(':id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('update_configs')
-  @UseInterceptors(FileInterceptor('logo'))
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateConfigDto, @UploadedFile() file?: Express.Multer.File) {
-    return this.configService.update(id, dto, file);
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'logo', maxCount: 1 },      // 1 file logo
+      { name: 'banner', maxCount: 10 },   // nhiều banner
+    ]),
+  )
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateConfigDto,
+    @UploadedFiles() files: { logo?: Express.Multer.File[]; banner?: Express.Multer.File[] },
+  ) {
+    const logoFile = files.logo?.[0];
+    const bannerFiles = files.banner || [];
+    return this.configService.update(id, dto, logoFile, bannerFiles);
   }
+
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)

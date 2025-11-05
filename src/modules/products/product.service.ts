@@ -249,6 +249,7 @@ async getPromotedProductsWithSearch(
               select: {
                 id: true,
                 name: true,
+                isFlashSale: true
               },
             },
           },

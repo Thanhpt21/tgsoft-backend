@@ -215,11 +215,10 @@ async create(userId: number, dto: CreateOrderDto) {
 async updateOrder(id: number, dto: UpdateOrderDto) {
   const existing = await this.prisma.order.findUnique({ 
     where: { id },
-    select: { id: true, status: true, inventoryUpdated: true }, // Lấy thêm inventoryUpdated
+    select: { id: true, status: true, inventoryUpdated: true },
   });
   if (!existing) return { success: false, message: 'Order không tồn tại' };
 
-  // Kiểm tra trạng thái cũ và mới
   const oldStatus = existing.status;
   const newStatus = dto.status;
 
@@ -227,7 +226,6 @@ async updateOrder(id: number, dto: UpdateOrderDto) {
     return { success: false, message: 'Trạng thái đơn hàng không hợp lệ' };
   }
 
-  // Xác định nhóm trạng thái
   const deductStatuses = ['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
   const restoreStatuses = ['CANCELLED', 'REFUNDED'];
 
@@ -249,14 +247,32 @@ async updateOrder(id: number, dto: UpdateOrderDto) {
 
   // Logic cập nhật kho
   if (deductStatuses.includes(newStatus) && existing.inventoryUpdated !== 'DEDUCTED') {
-    // Trừ kho nếu chưa trừ và trạng thái mới thuộc nhóm trừ kho
+    // Trừ kho nếu chưa trừ
     await this.updateInventoryFromOrder(id, newStatus, 'DEDUCT');
+
+    // --- TRỪ saleQuantity của sản phẩm và quà tặng ---
+    for (const item of updated.items) {
+      // Trừ sản phẩm chính
+      await this.prisma.promotionProduct.updateMany({
+        where: { productId: item.productVariant.product.id },
+        data: { saleQuantity: { decrement: item.quantity } },
+      });
+
+      // Trừ sản phẩm quà tặng nếu có
+      if (item.giftProductId && item.giftQuantity) {
+        await this.prisma.promotionProduct.updateMany({
+          where: { productId: item.giftProductId },
+          data: { saleQuantity: { decrement: item.giftQuantity } },
+        });
+      }
+    }
+
     await this.prisma.order.update({
       where: { id },
       data: { inventoryUpdated: 'DEDUCTED' },
     });
   } else if (restoreStatuses.includes(newStatus) && existing.inventoryUpdated !== 'RESTORED') {
-    // Cộng kho nếu chưa cộng và trạng thái mới thuộc nhóm cộng kho
+    // Cộng kho nếu chưa cộng
     await this.updateInventoryFromOrder(id, newStatus, 'RESTORE');
     await this.prisma.order.update({
       where: { id },
@@ -270,6 +286,7 @@ async updateOrder(id: number, dto: UpdateOrderDto) {
     data: new OrderResponseDto(updated),
   };
 }
+
 
 async updateInventoryFromOrder(orderId: number, newStatus: OrderStatus, action: 'DEDUCT' | 'RESTORE') {
   const order = await this.prisma.order.findUnique({
