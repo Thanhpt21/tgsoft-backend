@@ -19,20 +19,7 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: (origin, callback) => {
-      const allowedOrigins = [
-        'http://localhost:3000', 
-        'http://localhost:3001', 
-        'https://demo.aiban.vn',
-        'https://db.aiban.vn'
-      ];
-
-      if (allowedOrigins.includes(origin) || !origin) {
-        callback(null, true);  
-      } else {
-        callback(new Error('Not allowed by CORS'), false);  
-      }
-    },
+    origin: true,
     methods: 'GET,POST,PUT,DELETE,OPTIONS,PATCH',
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
     credentials: true,
