@@ -16,11 +16,7 @@ import { Logger } from '@nestjs/common';
 @WebSocketGateway({
   cors: {
     // 🔥 FIX: Cho phép cả 2 origins
-    origin: [
-      process.env.CLIENT_URL || 'https://demo.aiban.vn',
-      'https://demo.aiban.vn',
-      'http://localhost:3000', // Dev mode
-    ],
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST'],
   },
