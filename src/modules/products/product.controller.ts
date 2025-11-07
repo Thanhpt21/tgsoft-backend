@@ -55,10 +55,12 @@ export class ProductController {
     @Query('brandId') brandId?: string,  
     @Query('categoryId') categoryId?: string, 
     @Query('sortBy') sortBy: string = 'createdAt_desc',
+    @Query('isFeatured') isFeatured?: string,      
+    @Query('hasPromotion') hasPromotion?: string  
   ) {
     const brandIdNumber = brandId ? Number(brandId) : undefined;
     const categoryIdNumber = categoryId ? Number(categoryId) : undefined;
-    return this.productService.getProducts(+page, +limit, search, brandIdNumber, categoryIdNumber, sortBy);
+    return this.productService.getProducts(+page, +limit, search, brandIdNumber, categoryIdNumber, sortBy, isFeatured === 'true', hasPromotion === 'true');
   }
  
   @Get('promoted')

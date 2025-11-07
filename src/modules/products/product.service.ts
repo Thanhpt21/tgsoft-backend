@@ -359,7 +359,9 @@ async getProducts(
   search = '',
   brandId?: number,
   categoryId?: number,
-  sortBy = 'createdAt_desc'
+  sortBy = 'createdAt_desc',
+  isFeatured?: boolean,
+  hasPromotion?: boolean
 ) {
   const skip = (page - 1) * limit;
 
@@ -385,6 +387,22 @@ async getProducts(
   // Lọc theo categoryId
   if (categoryId) {
     where.categoryId = categoryId;
+  }
+
+  if (isFeatured === true) {
+    where.isFeatured = true;
+  }
+
+  if (hasPromotion === true) {
+    where.promotionProducts = {
+      some: {
+        promotion: {
+          status: { in: ['ACTIVE', 'SCHEDULED'] },
+          startTime: { lte: new Date() },
+          endTime: { gte: new Date() },
+        },
+      },
+    };
   }
 
   // Xử lý sắp xếp
