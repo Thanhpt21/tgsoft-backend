@@ -11,7 +11,9 @@ import { Server, Socket } from 'socket.io';
 import { ChatRedisService } from './redis/chat-redis.service';
 import { v4 as uuidv4 } from 'uuid';
 import { ChatService } from './chat.service';
-import { Logger } from '@nestjs/common';
+import { forwardRef, Inject, Logger } from '@nestjs/common';
+import { AiService } from './ai/ai.service';
+import { PrismaService } from 'prisma/prisma.service';
 
 @WebSocketGateway({
   cors: {
@@ -37,8 +39,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ChatGateway.name);
 
   constructor(
+    @Inject(forwardRef(() => ChatService))
     private readonly chatService: ChatService,
     private readonly chatRedisService: ChatRedisService,
+    private readonly aiService: AiService,
+    private readonly prisma: PrismaService
   ) {}
 
   async handleConnection(client: Socket) {
@@ -79,7 +84,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       if (userId && !isAdmin) {
         const result = await this.chatService.migrateMessagesToDb(sessionId, userId, tenantId);
-        if (result.conversationId) {
+        if ('conversationId' in result && result.conversationId) {
           client.data.conversationId = result.conversationId;
           client.join(`conversation:${result.conversationId}`);
           client.emit('conversation-updated', { conversationId: result.conversationId });
@@ -206,118 +211,133 @@ async handleJoinConversation(
     this.logger.log(`Client ${client.id} left conversation ${conversationId}`);
   }
 
-  @SubscribeMessage('send:message')
-  async handleSendMessage(
-    @MessageBody() data: { message: string; conversationId?: number; metadata?: any },
-    @ConnectedSocket() client: Socket,
-  ) {
-    try {
-      // Validate message
-      if (!data.message || typeof data.message !== 'string') {
-        client.emit('error', { message: 'Message is required' });
-        return;
+@SubscribeMessage('send:message')
+async handleSendMessage(
+  @MessageBody() data: { message: string; conversationId?: number; metadata?: any; tempId?: string },
+  @ConnectedSocket() client: Socket,
+) {
+  try {
+    // -------------------- 1️⃣ Validate message --------------------
+    if (!data.message || typeof data.message !== 'string') {
+      client.emit('error', { message: 'Message is required' });
+      return;
+    }
+
+    const trimmedMessage = data.message.trim();
+    if (trimmedMessage.length === 0) {
+      client.emit('error', { message: 'Message cannot be empty' });
+      return;
+    }
+
+    if (trimmedMessage.length > 5000) {
+      client.emit('error', { message: 'Message too long (max 5000 characters)' });
+      return;
+    }
+
+    const { userId, sessionId, tenantId, conversationId: clientConversationId } = client.data;
+    let conversationId = data.conversationId || clientConversationId;
+
+    // -------------------- 2️⃣ User đã login --------------------
+    let conversation: any;
+    if (userId) {
+      this.logger.log(`USER logged in - userId: ${userId}, message: "${trimmedMessage}"`);
+
+      if (!conversationId) {
+        conversation = await this.chatService.getOrCreateConversation({ userId, tenantId, sessionId });
+        conversationId = conversation.id;
       }
 
-      const trimmedMessage = data.message.trim();
-      if (trimmedMessage.length === 0) {
-        client.emit('error', { message: 'Message cannot be empty' });
-        return;
-      }
-
-      if (trimmedMessage.length > 5000) {
-        client.emit('error', { message: 'Message too long (max 5000 characters)' });
-        return;
-      }
-
-      const { userId, sessionId, tenantId, conversationId: clientConversationId } = client.data;
-      let conversationId = data.conversationId || clientConversationId;
-
-      // User đã login
-      if (userId) {
-        this.logger.log(`USER logged in - userId: ${userId}, sending message: "${trimmedMessage}"`);
-
-        // Tạo hoặc lấy conversation
-        if (!conversationId) {
-          const conversation = await this.chatService.getOrCreateConversation({
-            userId,
-            tenantId,
-            sessionId,
-          });
-          conversationId = conversation.id;
-        }
-
-        // Lưu message vào DB
-        const message = await this.chatService.saveUserMessage(
-          userId,
-          tenantId,
-          conversationId,
-          trimmedMessage,
-          sessionId,
-          data.metadata,
-        );
-
-        // Update conversationId trong client data nếu chưa có
-        if (!client.data.conversationId && message.conversationId) {
-          client.data.conversationId = message.conversationId;
-          client.join(`conversation:${message.conversationId}`);
-          client.emit('conversation-updated', { conversationId: message.conversationId });
-        }
-
-        // Emit message đến client và conversation room
-        client.emit('message', message);
-        client.to(`conversation:${message.conversationId}`).emit('message', message);
-        
-        // Thông báo cho admin có tin nhắn mới
-        this.server.to('admin-room').emit('new-user-message', {
-          conversationId: message.conversationId,
-          userId,
-          message: message,
-          tenantId,
-        });
-
-        return;
-      }
-
-      // Guest user (chưa login)
-      this.logger.log(`GUEST - sessionId: ${sessionId}, sending message: "${trimmedMessage}"`);
-      
-      // Lưu guest message vào Redis
-      const guestMessage = await this.chatService.saveGuestMessage(
-        sessionId,
+      const message = await this.chatService.saveUserMessage(
+        userId,
+        tenantId,
+        conversationId,
         trimmedMessage,
+        sessionId,
         data.metadata,
       );
 
-      // Emit message
-      client.emit('message', guestMessage);
-      client.to(`session:${sessionId}`).emit('message', guestMessage);
+      if (data.tempId) (message as any).tempId = data.tempId;
 
-      // Thông báo cho admin có guest message mới
+      if (!client.data.conversationId && message.conversationId) {
+        client.data.conversationId = message.conversationId;
+        client.join(`conversation:${message.conversationId}`);
+        client.emit('conversation-updated', { conversationId: message.conversationId });
+      }
+
+      this.server.to(`conversation:${message.conversationId}`).emit('message', message);
+
+      this.server.to('admin-room').emit('new-user-message', {
+        conversationId: message.conversationId,
+        userId,
+        message,
+        tenantId,
+      });
+    } else {
+      // -------------------- 3️⃣ Guest --------------------
+      this.logger.log(`GUEST - sessionId: ${sessionId}, message: "${trimmedMessage}"`);
+
+      const guestMessage = await this.chatService.saveGuestMessage(sessionId, trimmedMessage, data.metadata);
+      if (data.tempId) (guestMessage as any).tempId = data.tempId;
+
+      if (!client.rooms.has(`session:${sessionId}`)) client.join(`session:${sessionId}`);
+
+      this.server.to(`session:${sessionId}`).emit('message', guestMessage);
+
       this.server.to('admin-room').emit('new-guest-message', {
         sessionId,
         message: guestMessage,
-        tenantId, // Admin cần biết tenant để filter
+        tenantId,
       });
+    }
 
-      // Auto reply bot cho guest
-      setTimeout(async () => {
-        try {
-          const botMessage = await this.chatService.saveBotMessage(
-            sessionId,
-            "Cảm ơn bạn đã liên hệ! Admin sẽ phản hồi trong giây lát.",
-          );
-          client.emit('message', botMessage);
-          client.to(`session:${sessionId}`).emit('message', botMessage);
-        } catch (error) {
-          this.logger.error('Error sending bot message:', error);
-        }
-      }, 1000);
+    // -------------------- 4️⃣ AI Auto Reply (giống người thật) --------------------
+   try {
+  const tenant = await this.prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: {
+      aiChatEnabled: true,
+      aiSystemPrompt: true,
+      aiTemperature: true,
+      aiModel: true,
+      aiMaxTokens: true,
+      aiAutoReplyDelay: true,
+    },
+  });
 
-    } catch (error) {
-      this.logger.error('Error sending message:', error);
-      client.emit('error', { message: 'Lỗi khi gửi tin nhắn' });
+  if (tenant?.aiChatEnabled) {
+    // Delay giống người thật
+    const delayMs = tenant.aiAutoReplyDelay ?? 500;
+    await new Promise(r => setTimeout(r, delayMs));
+
+    const conversationHistory = userId
+      ? await this.prisma.chatMessage.findMany({
+          where: { conversationId },
+          orderBy: { createdAt: 'asc' },
+          select: { senderType: true, message: true },
+        })
+      : []; // guest có thể không có conversation
+
+    const aiReply = await this.aiService.generateTenantReply(tenantId, conversationHistory);
+
+    if (aiReply?.trim().length) {
+      const botMessage = userId
+        ? await this.chatService.saveBotMessageForUser(conversationId!, aiReply, userId)
+        : await this.chatService.saveBotMessage(sessionId, aiReply);
+
+      const room = userId ? `conversation:${conversationId}` : `session:${sessionId}`;
+      this.server.to(room).emit('message', botMessage); // <-- client lắng nghe 'message'
+      this.logger.log(`🤖 AI replied and emitted to ${room}: ${aiReply}`);
     }
   }
+} catch (aiErr) {
+  this.logger.error('❌ AI auto reply error:', aiErr);
+}
+
+  } catch (error) {
+    this.logger.error('Error sending message:', error);
+    client.emit('error', { message: 'Lỗi khi gửi tin nhắn' });
+  }
+}
 
   @SubscribeMessage('admin:send-message')
   async handleAdminSendMessage(
@@ -326,6 +346,7 @@ async handleJoinConversation(
       sessionId?: string; 
       message: string;
       metadata?: any;
+      tempId?: string;
     },
     @ConnectedSocket() client: Socket,
   ) {
@@ -362,8 +383,10 @@ async handleJoinConversation(
           data.metadata,
         );
 
-        // Emit message cho admin
-        client.emit('message', message);
+        if (data.tempId) {
+          (message as any).tempId = data.tempId;
+        }
+
 
         // Emit message cho user trong conversation
         this.server.to(`conversation:${data.conversationId}`).emit('message', message);

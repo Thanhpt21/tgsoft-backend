@@ -42,7 +42,7 @@ export class PermissionsGuard implements CanActivate {
 
     // Nếu user không có role nào trong tenant → Forbidden
     if (!userTenantRoles.length)
-      throw new ForbiddenException('Bạn không có quyền thực hiện hành động này');
+      throw new ForbiddenException('Bạn không có quyền thực hiện hành động này, vui lòng liên hệ quản trị viên');
 
     // Lấy tất cả permission của user
     const userPermissions = new Set<string>();
@@ -55,7 +55,7 @@ export class PermissionsGuard implements CanActivate {
     // Check tất cả permission yêu cầu
     const hasPermission = requiredPermissions.every(p => userPermissions.has(p));
     if (!hasPermission)
-      throw new ForbiddenException('Bạn không có quyền thực hiện hành động này');
+      throw new ForbiddenException('Bạn không có quyền thực hiện hành động này, vui lòng liên hệ quản trị viên');
 
     return true;
   }

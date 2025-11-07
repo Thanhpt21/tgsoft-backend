@@ -8,13 +8,17 @@ import {
   Param,
   BadRequestException,
   ParseIntPipe,
+  Put,
+  UseGuards,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { GetMessagesDto, MigrateMessagesDto } from './dto/send-message.dto';
+import { AiService } from './ai/ai.service';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(private readonly chatService: ChatService, private readonly aiService: AiService) {}
 
   // ============================================
   // USER ENDPOINTS
@@ -266,5 +270,27 @@ export class ChatController {
     const conversationIds = await this.chatService.getConversationIdsByUserId(userId, tenantId);
 
     return { conversationIds };
+  }
+
+ @Get(':tenantId/ai-enabled')
+  async isAiChatEnabled(@Param('tenantId', ParseIntPipe) tenantId: number) {
+    const enabled = await this.aiService.isAiChatEnabled(tenantId);
+    return { tenantId, aiChatEnabled: enabled };
+  }
+
+
+
+  @Put(':tenantId/ai-enabled')
+  @UseGuards(JwtAuthGuard)
+  async setAiChatEnabled(
+    @Param('tenantId', ParseIntPipe) tenantId: number,
+    @Body('aiChatEnabled') aiChatEnabled: boolean,
+  ) {
+    if (aiChatEnabled === undefined || aiChatEnabled === null) {
+      throw new BadRequestException('aiChatEnabled field is required');
+    }
+
+    const result = await this.aiService.setAiChatEnabled(tenantId, aiChatEnabled);
+    return { tenantId, aiChatEnabled: result };
   }
 }

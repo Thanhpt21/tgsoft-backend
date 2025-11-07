@@ -16,6 +16,7 @@ import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { UpdateTenantTierLimitsDto } from './dto/update-tenant-tier-limit';
+import { UpdateTenantAIDto } from './dto/update-tenant-ai.dto';
 
 @Controller('tenants')
 export class TenantsController {
@@ -75,5 +76,22 @@ export class TenantsController {
   @UseGuards(JwtAuthGuard)
   async deleteTenant(@Param('id', ParseIntPipe) id: number) {
     return await this.tenantsService.deleteTenant(id);
+  }
+
+   // ✅ Cập nhật cấu hình AI
+  @Put(':id/ai-config')
+  @UseGuards(JwtAuthGuard)
+  async updateAIConfig(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateTenantAIDto: UpdateTenantAIDto,
+  ) {
+    return await this.tenantsService.updateAIConfig(id, updateTenantAIDto);
+  }
+
+  // ✅ Bật/tắt AI chat
+  @Put(':id/toggle-ai')
+  @UseGuards(JwtAuthGuard)
+  async toggleAIChat(@Param('id', ParseIntPipe) id: number) {
+    return await this.tenantsService.toggleAIChat(id);
   }
 }

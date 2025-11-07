@@ -53,6 +53,16 @@ model Tenant {
   maxAccounts            Int                    @default(0)
   maxSKUs                Int                    @default(0)
   maxConcurrentUsers     Int                    @default(0)
+
+  aiChatEnabled          Boolean                @default(false)      // Bật/tắt AI chat
+  aiProvider             String?                @default("openai")   // Provider: openai, gemini, claude
+  aiModel                String?                @default("gpt-4o-mini") // Model name
+  aiSystemPrompt         String?                @db.Text             // Custom system prompt
+  aiTemperature          Float?                 @default(0.7)        // 0-2: Creativity level
+  aiMaxTokens            Int?                   @default(500)        // Max tokens per response
+  aiAutoReplyDelay       Int?                   @default(2000)       // Delay in milliseconds
+  apiKey                 String?
+
   attributes             Attribute[]
   blogs                  Blog[]
   Brand                  Brand[]
@@ -827,4 +837,11 @@ enum PromptAIStatus {
   ACTIVE
   INACTIVE
   DELETED
+}
+
+enum AIProvider {
+  OPENAI
+  GEMINI
+  CLAUDE
+  CUSTOM
 }

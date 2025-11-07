@@ -5,6 +5,7 @@ import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { slugify } from 'src/utils/slugify';
 import { Prisma } from '@prisma/client';
 import { UpdateTenantTierLimitsDto } from './dto/update-tenant-tier-limit';
+import { UpdateTenantAIDto } from './dto/update-tenant-ai.dto';
 
 @Injectable()
 export class TenantsService {
@@ -234,4 +235,46 @@ export class TenantsService {
   //     },
   //   };
   // }
+
+    async updateAIConfig(id: number, dto: UpdateTenantAIDto) {
+      const tenant = await this.prisma.tenant.findUnique({ where: { id } });
+      if (!tenant) throw new NotFoundException('Tenant không tồn tại');
+
+      const updated = await this.prisma.tenant.update({
+        where: { id },
+        data: {
+          ...(dto.aiChatEnabled !== undefined && { aiChatEnabled: dto.aiChatEnabled }),
+          ...(dto.aiProvider && { aiProvider: dto.aiProvider }),
+          ...(dto.aiModel && { aiModel: dto.aiModel }),
+          ...(dto.aiSystemPrompt && { aiSystemPrompt: dto.aiSystemPrompt }),
+          ...(dto.aiTemperature !== undefined && { aiTemperature: dto.aiTemperature }),
+          ...(dto.aiMaxTokens !== undefined && { aiMaxTokens: dto.aiMaxTokens }),
+          ...(dto.aiAutoReplyDelay !== undefined && { aiAutoReplyDelay: dto.aiAutoReplyDelay }),
+           ...(dto.apiKey && { apiKey: dto.apiKey }),
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Cập nhật cấu hình AI thành công',
+        data: updated,
+      };
+    }
+
+  // ✅ Bật / tắt AI chat nhanh
+  async toggleAIChat(id: number) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) throw new NotFoundException('Tenant không tồn tại');
+
+    const updated = await this.prisma.tenant.update({
+      where: { id },
+      data: { aiChatEnabled: !tenant.aiChatEnabled },
+    });
+
+    return {
+      success: true,
+      message: `${updated.aiChatEnabled ? 'Đã bật' : 'Đã tắt'} AI chat thành công`,
+      data: updated,
+    };
+  }
 }
