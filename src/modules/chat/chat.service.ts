@@ -3,7 +3,6 @@ import { ChatRedisService, ChatMessageRedis } from './redis/chat-redis.service';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from 'prisma/prisma.service';
 import { ChatConversation } from '@prisma/client';
-import { AiService } from './ai/ai.service';
 import { ChatGateway } from './chat.gateway';
 
 @Injectable()
@@ -13,7 +12,6 @@ export class ChatService {
   constructor(
     private prisma: PrismaService,
     private chatRedisService: ChatRedisService,
-    private aiService: AiService,
     @Inject(forwardRef(() => ChatGateway))
     private chatGateway: ChatGateway,
   ) {}
@@ -137,9 +135,6 @@ export class ChatService {
     }
   }
 
-  /**
-   * Lưu tin nhắn của guest (chưa login) vào Redis
-   */
   async saveGuestMessage(
     sessionId: string,
     message: string,
@@ -203,142 +198,108 @@ export class ChatService {
     }
   }
 
+  /**
+   * Lưu tin nhắn bot vào DB (cho user login)
+   */
   async saveBotMessageForUser(
-  conversationId: number,
-  message: string,
-  userId?: number, // optional, để gắn vào conversation
-  metadata?: any,
-) {
-  try {
-    const trimmed = message?.trim();
+    conversationId: number | null,
+    sessionId: string | null,
+    message: string,
+    metadata?: any,
+  ) {
+    const trimmed = message.trim();
     if (!trimmed) throw new Error('Bot message cannot be empty');
 
-    // Lưu bot message vào DB
-    const botMessage = await this.prisma.chatMessage.create({
-      data: {
-        conversationId,
-        senderId: userId ?? null,
-        senderType: 'BOT',
-        message: trimmed,
-        metadata: { ...metadata, ai: true },
-      },
-    });
+    // TẠO OBJECT DATA THÔNG MINH – CHỈ THÊM FIELD NẾU CÓ GIÁ TRỊ
+    const data: any = {
+      senderId: null,
+      senderType: 'BOT' as const,
+      message: trimmed,
+      metadata: { ...metadata, ai: true },
+    };
 
-    this.logger.log(`🤖 Bot message ${botMessage.id} saved in conversation ${conversationId}`);
-
-    // Emit message realtime qua WebSocket
-    try {
-      this.chatGateway.server
-        .to(`conversation:${conversationId}`)
-        .emit('receive:message', botMessage);
-
-      this.logger.log(`🚀 Bot message emitted to conversation:${conversationId}`);
-    } catch (emitErr) {
-      this.logger.warn('⚠️ Failed to emit bot message:', emitErr);
+    // Chỉ thêm conversationId nếu KHÁC null
+    if (conversationId !== null) {
+      data.conversationId = conversationId;
     }
 
+    // Chỉ thêm sessionId nếu KHÁC null
+    if (sessionId !== null) {
+      data.sessionId = sessionId;
+    }
+
+    const botMessage = await this.prisma.chatMessage.create({
+      data,
+    });
+
+    this.logger.log(`Bot message ${botMessage.id} saved`);
     return botMessage;
-  } catch (error) {
-    this.logger.error('❌ Error saving bot message:', error);
-    throw error;
   }
-}
 
   /**
    * Lưu tin nhắn của user (đã login) vào DB
    */
-async saveUserMessage(
-  userId: number,
-  tenantId: number,
-  conversationId: number | undefined,
-  message: string,
-  sessionId: string,
-  metadata?: any,
-) {
-  try {
-    // === 1️⃣ Validate input ===
-    const trimmed = message?.trim();
-    console.log('📥 Client sent message:', { userId, tenantId, conversationId, message, sessionId, metadata });
-    if (!trimmed) throw new Error('Message cannot be empty');
-    if (trimmed.length > 5000) throw new Error('Message too long (max 5000 chars)');
+  async saveUserMessage(
+    userId: number,
+    tenantId: number,
+    conversationId: number | undefined,
+    message: string,
+    sessionId: string,
+    metadata?: any,
+  ) {
+    try {
+      // === 1️⃣ Validate input ===
+      const trimmed = message?.trim();
+      console.log('📥 Client sent message:', { userId, tenantId, conversationId, message, sessionId, metadata });
+      if (!trimmed) throw new Error('Message cannot be empty');
+      if (trimmed.length > 5000) throw new Error('Message too long (max 5000 chars)');
 
-    // === 2️⃣ Lấy hoặc tạo conversation ===
-    let conversation = conversationId
-      ? await this.prisma.chatConversation.findUnique({ where: { id: conversationId } })
-      : null;
+      // === 2️⃣ Lấy hoặc tạo conversation ===
+      let conversation = conversationId
+        ? await this.prisma.chatConversation.findUnique({ where: { id: conversationId } })
+        : null;
 
-    if (!conversation && userId) {
-      conversation = await this.getOrCreateConversation({
-        userId,
-        tenantId,
-        sessionId,
-      });
-    }
-
-    if (!conversation) throw new Error('Cannot create or find conversation');
-
-    // === 3️⃣ Lưu message của USER ===
-    const dbMessage = await this.prisma.$transaction(async (tx) => {
-      const msg = await tx.chatMessage.create({
-        data: {
-          conversationId: conversation.id,
-          senderId: userId,
-          senderType: 'USER',
-          message: trimmed,
-          metadata,
+      if (!conversation && userId) {
+        conversation = await this.getOrCreateConversation({
+          userId,
+          tenantId,
           sessionId,
-        },
+        });
+      }
+
+      if (!conversation) throw new Error('Cannot create or find conversation');
+
+      // === 3️⃣ Lưu message của USER ===
+      const dbMessage = await this.prisma.$transaction(async (tx) => {
+        const msg = await tx.chatMessage.create({
+          data: {
+            conversationId: conversation.id,
+            senderId: userId,
+            senderType: 'USER',
+            message: trimmed,
+            metadata,
+            sessionId,
+          },
+        });
+
+        await tx.chatConversation.update({
+          where: { id: conversation.id },
+          data: { updatedAt: new Date() },
+        });
+
+        this.logger.log(`💬 User message ${msg.id} saved in conversation ${conversation.id}`);
+        return msg;
       });
 
-      await tx.chatConversation.update({
-        where: { id: conversation.id },
-        data: { updatedAt: new Date() },
-      });
+      // === 4️⃣ Trả về message của user ===
+      return dbMessage;
 
-      this.logger.log(`💬 User message ${msg.id} saved in conversation ${conversation.id}`);
-      return msg;
-    });
-
-    // === 4️⃣ Trả về message của user ===
-    return dbMessage;
-
-  } catch (error) {
-    this.logger.error('Error saving user message:', error);
-    throw error;
+    } catch (error) {
+      this.logger.error('Error saving user message:', error);
+      throw error;
+    }
   }
-}
 
-
-
-/**
- * Bot suy nghĩ và trả lời cho guest
- */
-// async botReplyForGuest(sessionId: string, message?: string) {
-//   try {
-//     // 1️⃣ Delay nếu cần
-//     const delayMs = 1000;
-//     await new Promise((r) => setTimeout(r, delayMs));
-
-//     // 2️⃣ Gọi AI service tạo câu trả lời (hoặc message mặc định)
-//     let aiReply = "Xin chào! Tôi là trợ lý AI. Tôi có thể giúp gì cho bạn? 🤖";
-
-//     if (this.aiService && message) {
-//       aiReply = await this.aiService.generateGuestReply(sessionId, message);
-//     }
-
-//     // 3️⃣ Lưu bot message vào Redis
-//     const botMessage = await this.saveBotMessage(sessionId, aiReply);
-
-//     // 4️⃣ Emit realtime
-//     this.chatGateway.server.to(`session:${sessionId}`).emit('message', botMessage);
-
-//     this.logger.log(`🤖 Bot replied to guest session ${sessionId}: ${aiReply}`);
-//     return botMessage;
-
-//   } catch (error) {
-//     this.logger.error('❌ Error in botReplyForGuest:', error);
-//   }
-// }
 
 
   /**
@@ -971,5 +932,4 @@ async getConversationIdsByUserId(
   }
 }
 
-  
 }

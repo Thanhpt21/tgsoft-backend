@@ -39,6 +39,12 @@ export class TenantsController {
     return await this.tenantsService.getTenants(+page, +limit, search);
   }
 
+  
+  @Get(':id/ai-status')
+  async getAIChatStatus(@Param('id', ParseIntPipe) id: number) {
+    return await this.tenantsService.getAIChatStatus(id);
+  }
+
   // Lấy tenant theo id
   @Get(':id')
   async getTenantById(@Param('id', ParseIntPipe) id: number) {
@@ -94,4 +100,5 @@ export class TenantsController {
   async toggleAIChat(@Param('id', ParseIntPipe) id: number) {
     return await this.tenantsService.toggleAIChat(id);
   }
+
 }

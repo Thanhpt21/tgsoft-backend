@@ -12,18 +12,15 @@ import { ChatRedisService } from './redis/chat-redis.service';
 import { v4 as uuidv4 } from 'uuid';
 import { ChatService } from './chat.service';
 import { forwardRef, Inject, Logger } from '@nestjs/common';
-import { AiService } from './ai/ai.service';
 import { PrismaService } from 'prisma/prisma.service';
 
 @WebSocketGateway({
   cors: {
-    // 🔥 FIX: Cho phép cả 2 origins
     origin: true,
     credentials: true,
     methods: ['GET', 'POST'],
   },
   namespace: '/chat',
-  // 🔥 FIX: Thêm transports và config production
   transports: ['websocket', 'polling'],
   allowEIO3: true,
   pingTimeout: 60000,
@@ -42,7 +39,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @Inject(forwardRef(() => ChatService))
     private readonly chatService: ChatService,
     private readonly chatRedisService: ChatRedisService,
-    private readonly aiService: AiService,
+
     private readonly prisma: PrismaService
   ) {}
 
@@ -181,19 +178,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-@SubscribeMessage('join:conversation')
-async handleJoinConversation(
-  @MessageBody() conversationId: number,
-  @ConnectedSocket() client: Socket,
-) {
-  if (!conversationId || conversationId <= 0) {
-    client.emit('error', { message: 'Invalid conversationId' });
-    return;
+  @SubscribeMessage('join:conversation')
+  async handleJoinConversation(
+    @MessageBody() conversationId: number,
+    @ConnectedSocket() client: Socket,
+  ) {
+    if (!conversationId || conversationId <= 0) {
+      client.emit('error', { message: 'Invalid conversationId' });
+      return;
+    }
+    client.join(`conversation:${conversationId}`);
+    client.data.conversationId = conversationId;
+    this.logger.log(`Client ${client.id} (userId: ${client.data.userId}, isAdmin: ${client.data.isAdmin}) joined conversation ${conversationId}`);
   }
-  client.join(`conversation:${conversationId}`);
-  client.data.conversationId = conversationId;
-  this.logger.log(`Client ${client.id} (userId: ${client.data.userId}, isAdmin: ${client.data.isAdmin}) joined conversation ${conversationId}`);
-}
 
   @SubscribeMessage('leave:conversation')
   async handleLeaveConversation(
@@ -289,50 +286,7 @@ async handleSendMessage(
         tenantId,
       });
     }
-
-    // -------------------- 4️⃣ AI Auto Reply (giống người thật) --------------------
-   try {
-  const tenant = await this.prisma.tenant.findUnique({
-    where: { id: tenantId },
-    select: {
-      aiChatEnabled: true,
-      aiSystemPrompt: true,
-      aiTemperature: true,
-      aiModel: true,
-      aiMaxTokens: true,
-      aiAutoReplyDelay: true,
-    },
-  });
-
-  if (tenant?.aiChatEnabled) {
-    // Delay giống người thật
-    const delayMs = tenant.aiAutoReplyDelay ?? 500;
-    await new Promise(r => setTimeout(r, delayMs));
-
-    const conversationHistory = userId
-      ? await this.prisma.chatMessage.findMany({
-          where: { conversationId },
-          orderBy: { createdAt: 'asc' },
-          select: { senderType: true, message: true },
-        })
-      : []; // guest có thể không có conversation
-
-    const aiReply = await this.aiService.generateTenantReply(tenantId, conversationHistory);
-
-    if (aiReply?.trim().length) {
-      const botMessage = userId
-        ? await this.chatService.saveBotMessageForUser(conversationId!, aiReply, userId)
-        : await this.chatService.saveBotMessage(sessionId, aiReply);
-
-      const room = userId ? `conversation:${conversationId}` : `session:${sessionId}`;
-      this.server.to(room).emit('message', botMessage); // <-- client lắng nghe 'message'
-      this.logger.log(`🤖 AI replied and emitted to ${room}: ${aiReply}`);
-    }
-  }
-} catch (aiErr) {
-  this.logger.error('❌ AI auto reply error:', aiErr);
-}
-
+   
   } catch (error) {
     this.logger.error('Error sending message:', error);
     client.emit('error', { message: 'Lỗi khi gửi tin nhắn' });
@@ -421,6 +375,64 @@ async handleSendMessage(
     }
   }
 
+   @SubscribeMessage('bot:send-message')
+  async handleBotSendMessage(
+    @MessageBody() data: { 
+      conversationId?: number;
+      sessionId?: string;
+      message: string;
+      metadata?: any;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      if (!data.message || data.message.trim().length === 0) {
+        client.emit('error', { message: 'Bot message cannot be empty' });
+        return;
+      }
+
+      const trimmedMessage = data.message.trim();
+
+      // Trường hợp 1: BOT reply cho user đã login (có conversationId)
+      if (data.conversationId) {
+        this.logger.log(`🤖 BOT sending message to conversation ${data.conversationId}`);
+
+        const botMessage = await this.chatService.saveBotMessageForUser(
+          data.conversationId,
+          trimmedMessage,
+          data.metadata,
+        );
+
+        // Emit message cho tất cả clients trong conversation
+        this.server.to(`conversation:${data.conversationId}`).emit('message', botMessage);
+
+        this.logger.log(`🤖 Bot message saved and sent to conversation ${data.conversationId}`);
+        return;
+      }
+
+      // Trường hợp 2: BOT reply cho guest (chỉ có sessionId)
+      if (data.sessionId) {
+        this.logger.log(`🤖 BOT sending message to guest session ${data.sessionId}`);
+
+        const botMessage = await this.chatService.saveBotMessage(
+          data.sessionId,
+          trimmedMessage,
+        );
+
+        // Emit message cho guest trong session room
+        this.server.to(`session:${data.sessionId}`).emit('message', botMessage);
+
+        this.logger.log(`🤖 Bot message saved and sent to session ${data.sessionId}`);
+        return;
+      }
+
+      client.emit('error', { message: 'conversationId or sessionId is required' });
+    } catch (error) {
+      this.logger.error('Error in bot send message:', error);
+      client.emit('error', { message: 'Lỗi khi lưu tin nhắn BOT' });
+    }
+  }
+
   @SubscribeMessage('typing:start')
   async handleTypingStart(
     @MessageBody() data: { conversationId?: number },
@@ -438,6 +450,7 @@ async handleSendMessage(
       });
     }
   }
+  
 
   @SubscribeMessage('typing:stop')
   async handleTypingStop(

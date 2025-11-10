@@ -13,12 +13,11 @@ import {
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { GetMessagesDto, MigrateMessagesDto } from './dto/send-message.dto';
-import { AiService } from './ai/ai.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService, private readonly aiService: AiService) {}
+  constructor(private readonly chatService: ChatService) {}
 
   // ============================================
   // USER ENDPOINTS
@@ -32,6 +31,11 @@ export class ChatController {
   async getMessages(@Query() query: GetMessagesDto) {
     const { conversationId, sessionId, userId } = query;
 
+     // Lấy từ DB nếu có conversationId
+    if (conversationId) {
+      const messages = await this.chatService.getConversationMessages(conversationId);
+      return { messages };
+    }
     
     if (userId) {
       const userIdNum = parseInt(userId as any, 10);
@@ -44,11 +48,6 @@ export class ChatController {
       return { conversations };
     }
 
-    // Lấy từ DB nếu có conversationId
-    if (conversationId) {
-      const messages = await this.chatService.getConversationMessages(conversationId);
-      return { messages };
-    }
 
     // Lấy từ Redis nếu có sessionId
     if (sessionId) {
@@ -247,6 +246,27 @@ export class ChatController {
     return { conversations };
   }
 
+  @Post('save-bot-message')
+  async saveBotMessageForUser(
+    @Body('message') message: string,
+    @Body('conversationId') conversationId?: number,     // ← OPTIONAL
+    @Body('sessionId') sessionId?: string,               // ← THÊM CÁI NÀY
+    @Body('metadata') metadata?: any,
+  ) {
+    if (!message?.trim()) {
+      throw new BadRequestException('Message is required');
+    }
+
+    const botMessage = await this.chatService.saveBotMessageForUser(
+      conversationId ?? null,
+      sessionId ?? null,
+      message.trim(),
+      metadata
+    );
+
+    return { success: true, botMessage };
+  }
+
   /**
    * [ADMIN] Get statistics
    */
@@ -270,27 +290,5 @@ export class ChatController {
     const conversationIds = await this.chatService.getConversationIdsByUserId(userId, tenantId);
 
     return { conversationIds };
-  }
-
- @Get(':tenantId/ai-enabled')
-  async isAiChatEnabled(@Param('tenantId', ParseIntPipe) tenantId: number) {
-    const enabled = await this.aiService.isAiChatEnabled(tenantId);
-    return { tenantId, aiChatEnabled: enabled };
-  }
-
-
-
-  @Put(':tenantId/ai-enabled')
-  @UseGuards(JwtAuthGuard)
-  async setAiChatEnabled(
-    @Param('tenantId', ParseIntPipe) tenantId: number,
-    @Body('aiChatEnabled') aiChatEnabled: boolean,
-  ) {
-    if (aiChatEnabled === undefined || aiChatEnabled === null) {
-      throw new BadRequestException('aiChatEnabled field is required');
-    }
-
-    const result = await this.aiService.setAiChatEnabled(tenantId, aiChatEnabled);
-    return { tenantId, aiChatEnabled: result };
   }
 }

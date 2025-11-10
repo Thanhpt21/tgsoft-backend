@@ -8,7 +8,7 @@ import redisConfig from '../../config/redis.config';
 import { PrismaModule } from 'prisma/prisma.module';
 import { ChatService } from './chat.service';
 import { RedisModule } from 'src/core/redis/redis.module';
-import { AiService } from './ai/ai.service';
+
 
 @Module({
   imports: [
@@ -18,7 +18,7 @@ import { AiService } from './ai/ai.service';
     forwardRef(() => ChatModule),
   ],
   controllers: [ChatController],
-  providers: [ChatService, ChatGateway, ChatRedisService, AiService],
-  exports: [ChatService, ChatRedisService, AiService],
+  providers: [ChatService, ChatGateway, ChatRedisService],
+  exports: [ChatService, ChatRedisService],
 })
 export class ChatModule {}

@@ -624,7 +624,7 @@ model ChatConversation {
 
 model ChatMessage {
   id             Int              @id @default(autoincrement())
-  conversationId Int
+  conversationId Int?
   senderId       Int?
   senderType     SenderType
   message        String
@@ -632,7 +632,7 @@ model ChatMessage {
   sessionId      String?
   isRead         Boolean          @default(false)
   createdAt      DateTime         @default(now())
-  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation   ChatConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
   @@index([createdAt])

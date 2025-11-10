@@ -277,4 +277,14 @@ export class TenantsService {
       data: updated,
     };
   }
+
+   async getAIChatStatus(id: number): Promise<boolean> {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id } });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant không tồn tại');
+    }
+
+    return tenant.aiChatEnabled;
+  }
 }
