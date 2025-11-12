@@ -44,4 +44,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsNumber()
   tokenAI?: number;
+
+  @IsOptional()
+  @IsString()
+  token?: string;
 }

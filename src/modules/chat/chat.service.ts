@@ -84,6 +84,40 @@ export class ChatService {
   }
 
   /**
+ * Tạo conversation cho guest
+ */
+async createGuestConversation(sessionId: string, tenantId: number) {
+  try {
+    // Kiểm tra xem đã có conversation chưa
+    const existingConversation = await this.prisma.chatConversation.findFirst({
+      where: { 
+        sessionId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (existingConversation) {
+      return existingConversation;
+    }
+
+    // Tạo conversation mới
+    const conversation = await this.prisma.chatConversation.create({
+      data: {
+        sessionId,
+        tenantId,
+        status: 'ACTIVE',
+      },
+    });
+
+    this.logger.log(`Created guest conversation ${conversation.id} for session ${sessionId}`);
+    return conversation;
+  } catch (error) {
+    this.logger.error(`Error creating guest conversation for session ${sessionId}:`, error);
+    throw error;
+  }
+}
+
+  /**
    * Lấy hoặc tạo conversation cho user
    * Dùng sessionId để link với guest messages nếu có
    */

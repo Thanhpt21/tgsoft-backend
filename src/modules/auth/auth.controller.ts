@@ -10,10 +10,11 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { AuthGuard } from '@nestjs/passport';
 import { UserResponseDto } from './dto/user-response.dto';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from 'prisma/prisma.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService, private readonly prisma: PrismaService) {}
 
   @Post('register')
   async register(@Body() dto: RegisterDto, @Req() req: Request) {
@@ -73,13 +74,23 @@ export class AuthController {
   }
 
 
+  // auth.controller.ts
   @Get('current')
   @UseGuards(JwtAuthGuard)
   async getCurrentUser(@CurrentUser() user: any) {
+    // Lấy token từ database
+    const userWithToken = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { token: true }
+    });
+
     return {
       success: true,
       message: 'Lấy thông tin người dùng thành công',
-      data: user,
+      data: {
+        ...user,
+        token: userWithToken?.token || null // Thêm token vào response
+      },
     };
   }
 

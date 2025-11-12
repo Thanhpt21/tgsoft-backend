@@ -20,6 +20,7 @@ model User {
   isActive              Boolean                @default(true)
   type_account          String                 @default("normal")
   tokenAI               Int                    @default(0)
+  token                 String?                    
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   tenantId              Int?

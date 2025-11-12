@@ -249,6 +249,10 @@ async getUsers(page = 1, limit = 10, search = '') {
       data.avatar = imageUrl;
     }
 
+    if (updateUserDto.token !== undefined) {
+      data.token = updateUserDto.token;
+    }
+
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data,

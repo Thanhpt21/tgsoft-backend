@@ -43,6 +43,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly prisma: PrismaService
   ) {}
 
+  
+
   async handleConnection(client: Socket) {
     try {
       const userId = client.handshake.auth.userId 
@@ -106,6 +108,53 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.chatRedisService.setUserOffline(client.data.userId);
     }
   }
+
+  @SubscribeMessage('create:guest-conversation')
+async handleCreateGuestConversation(
+  @MessageBody() data: { sessionId: string; tenantId: number },
+  @ConnectedSocket() client: Socket,
+) {
+  try {
+    const { sessionId, tenantId } = data;
+
+    // Validate
+    if (!sessionId) {
+      client.emit('error', { message: 'SessionId is required' });
+      return;
+    }
+
+    this.logger.log(`Creating guest conversation for session: ${sessionId}`);
+
+    // Tạo conversation cho guest trong DB
+    const conversation = await this.prisma.chatConversation.create({
+      data: {
+        sessionId,
+        tenantId,
+        status: 'ACTIVE',
+        // Không có userId vì là guest
+      },
+    });
+
+    // Cập nhật client data
+    client.data.conversationId = conversation.id;
+    client.data.sessionId = sessionId;
+    client.data.tenantId = tenantId;
+
+    // Join conversation room
+    client.join(`conversation:${conversation.id}`);
+
+    // Gửi response về client
+    client.emit('guest-conversation-created', { 
+      conversationId: conversation.id 
+    });
+
+    this.logger.log(`Guest conversation created: ${conversation.id} for session ${sessionId}`);
+
+  } catch (error) {
+    this.logger.error('Error creating guest conversation:', error);
+    client.emit('error', { message: 'Lỗi khi tạo conversation cho guest' });
+  }
+}
 
   @SubscribeMessage('user-login')
   async handleUserLogin(
@@ -210,7 +259,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
 @SubscribeMessage('send:message')
 async handleSendMessage(
-  @MessageBody() data: { message: string; conversationId?: number; metadata?: any; tempId?: string },
+  @MessageBody() data: { 
+    message: string; 
+    conversationId?: number; 
+    metadata?: any; 
+    tempId?: string;
+    sessionId?: string;
+    tenantId?: number;
+  },
   @ConnectedSocket() client: Socket,
 ) {
   try {
@@ -231,7 +287,11 @@ async handleSendMessage(
       return;
     }
 
-    const { userId, sessionId, tenantId, conversationId: clientConversationId } = client.data;
+    const { userId, sessionId: clientSessionId, tenantId: clientTenantId, conversationId: clientConversationId } = client.data;
+    
+    // Sử dụng sessionId từ client hoặc từ client data
+    const sessionId = data.sessionId || clientSessionId;
+    const tenantId = data.tenantId || clientTenantId;
     let conversationId = data.conversationId || clientConversationId;
 
     // -------------------- 2️⃣ User đã login --------------------
@@ -273,23 +333,58 @@ async handleSendMessage(
       // -------------------- 3️⃣ Guest --------------------
       this.logger.log(`GUEST - sessionId: ${sessionId}, message: "${trimmedMessage}"`);
 
-      const guestMessage = await this.chatService.saveGuestMessage(sessionId, trimmedMessage, data.metadata);
+      // Nếu guest chưa có conversation, tạo mới
+      if (!conversationId) {
+        conversation = await this.chatService.createGuestConversation(sessionId, tenantId);
+        conversationId = conversation.id;
+        
+        // Cập nhật client data và join room
+        client.data.conversationId = conversationId;
+        client.join(`conversation:${conversationId}`);
+        
+        // Thông báo cho client
+        client.emit('conversation-updated', { conversationId });
+      }
+
+      // Lưu tin nhắn guest vào DB (thay vì Redis)
+      const guestMessage = await this.prisma.chatMessage.create({
+        data: {
+          conversationId,
+          senderType: 'GUEST',
+          message: trimmedMessage,
+          metadata: {
+            ...data.metadata,
+            isGuest: true,
+            guestSessionId: sessionId
+          },
+          sessionId,
+        },
+      });
+
       if (data.tempId) (guestMessage as any).tempId = data.tempId;
 
-      if (!client.rooms.has(`session:${sessionId}`)) client.join(`session:${sessionId}`);
+      // Emit message
+      this.server.to(`conversation:${conversationId}`).emit('message', guestMessage);
 
-      this.server.to(`session:${sessionId}`).emit('message', guestMessage);
-
+      // Thông báo cho admin
       this.server.to('admin-room').emit('new-guest-message', {
+        conversationId,
         sessionId,
         message: guestMessage,
         tenantId,
       });
+
+      this.logger.log(`Guest message saved to conversation ${conversationId}`);
     }
    
   } catch (error) {
     this.logger.error('Error sending message:', error);
     client.emit('error', { message: 'Lỗi khi gửi tin nhắn' });
+    
+    // Gửi lỗi về cho tempId nếu có
+    if (data.tempId) {
+      client.emit('message:failed', { tempId: data.tempId });
+    }
   }
 }
 
