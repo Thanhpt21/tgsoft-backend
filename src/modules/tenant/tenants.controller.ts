@@ -29,6 +29,11 @@ export class TenantsController {
     return await this.tenantsService.create(createTenantDto);
   }
 
+   @Get(':id/ai-config')
+  async getTenantAIConfig(@Param('id') id: string) {
+    return this.tenantsService.getTenantAIConfig(parseInt(id));
+  }
+
   // Lấy danh sách tenant với phân trang + search
   @Get()
   async getTenants(

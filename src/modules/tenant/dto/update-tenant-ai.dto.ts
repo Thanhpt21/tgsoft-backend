@@ -13,9 +13,10 @@ export class UpdateTenantAIDto {
   @IsString()
   aiModel?: string;
 
+  // Thay đổi từ string sang number để lưu ID của PromptAI
   @IsOptional()
-  @IsString()
-  aiSystemPrompt?: string;
+  @IsNumber()
+  aiSystemPromptId?: number;
 
   @IsOptional()
   @IsNumber()

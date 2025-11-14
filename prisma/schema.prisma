@@ -58,11 +58,13 @@ model Tenant {
   aiChatEnabled          Boolean                @default(false)      // Bật/tắt AI chat
   aiProvider             String?                @default("openai")   // Provider: openai, gemini, claude
   aiModel                String?                @default("gpt-4o-mini") // Model name
-  aiSystemPrompt         String?                @db.Text             // Custom system prompt
   aiTemperature          Float?                 @default(0.7)        // 0-2: Creativity level
   aiMaxTokens            Int?                   @default(500)        // Max tokens per response
   aiAutoReplyDelay       Int?                   @default(2000)       // Delay in milliseconds
   apiKey                 String?
+
+  aiSystemPromptId       Int?
+  aiSystemPrompt         PromptAI?              @relation(fields: [aiSystemPromptId], references: [id])
 
   attributes             Attribute[]
   blogs                  Blog[]
@@ -650,6 +652,8 @@ model PromptAI {
   endDate   DateTime
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+
+  tenants   Tenant[]
 
   @@index([status])
 }

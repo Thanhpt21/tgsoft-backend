@@ -246,14 +246,18 @@ export class TenantsService {
           ...(dto.aiChatEnabled !== undefined && { aiChatEnabled: dto.aiChatEnabled }),
           ...(dto.aiProvider && { aiProvider: dto.aiProvider }),
           ...(dto.aiModel && { aiModel: dto.aiModel }),
-          ...(dto.aiSystemPrompt && { aiSystemPrompt: dto.aiSystemPrompt }),
+          ...(dto.aiSystemPromptId !== undefined && { 
+        aiSystemPrompt: dto.aiSystemPromptId 
+          ? { connect: { id: dto.aiSystemPromptId } }
+          : { disconnect: true }
+      }),
           ...(dto.aiTemperature !== undefined && { aiTemperature: dto.aiTemperature }),
           ...(dto.aiMaxTokens !== undefined && { aiMaxTokens: dto.aiMaxTokens }),
           ...(dto.aiAutoReplyDelay !== undefined && { aiAutoReplyDelay: dto.aiAutoReplyDelay }),
            ...(dto.apiKey && { apiKey: dto.apiKey }),
         },
       });
-
+      
       return {
         success: true,
         message: 'Cập nhật cấu hình AI thành công',
@@ -286,5 +290,34 @@ export class TenantsService {
     }
 
     return tenant.aiChatEnabled;
+  }
+
+  async getTenantAIConfig(id: number) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+      include: {
+        aiSystemPrompt: true // Include để lấy cả thông tin prompt
+      }
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant không tồn tại');
+    }
+
+    return {
+      success: true,
+      message: 'Lấy cấu hình AI thành công',
+      data: {
+        id: tenant.id,
+        aiChatEnabled: tenant.aiChatEnabled,
+        aiProvider: tenant.aiProvider,
+        aiModel: tenant.aiModel,
+        aiSystemPromptId: tenant.aiSystemPromptId, // Chỉ trả về ID
+        aiSystemPrompt: tenant.aiSystemPrompt, // Và cả object prompt
+        aiTemperature: tenant.aiTemperature,
+        aiMaxTokens: tenant.aiMaxTokens,
+        aiAutoReplyDelay: tenant.aiAutoReplyDelay,
+      }
+    };
   }
 }
