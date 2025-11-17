@@ -277,4 +277,147 @@ async getUsers(page = 1, limit = 10, search = '') {
       data: null,
     };
   }
+
+  // Thêm vào UsersService trong src/users/users.service.ts
+
+async getTenantAdminShop(tenantId?: number) {
+  const targetTenantId = tenantId || this.tenantId;
+  
+  const adminShopUser = await this.prisma.user.findFirst({
+    where: {
+      role: 'adminshop',
+      tenantId: targetTenantId
+    },
+    select: { 
+      id: true,
+      name: true,
+      email: true,
+      tokenAI: true,
+      token: true,
+      role: true,
+      tenantId: true,
+      isActive: true
+    }
+  });
+
+  if (!adminShopUser) {
+    throw new NotFoundException(`Admin shop not found for tenant ${targetTenantId}`);
+  }
+
+  return {
+    success: true,
+    message: 'Lấy thông tin admin shop thành công',
+    data: adminShopUser
+  };
+}
+
+async updateTenantAdminShopTokens(tokensUsed: number, tenantId?: number) {
+  const targetTenantId = tenantId || this.tenantId;
+  
+  // Tìm admin shop của tenant
+  const adminShopUser = await this.prisma.user.findFirst({
+    where: {
+      role: 'adminshop',
+      tenantId: targetTenantId
+    },
+    select: { 
+      id: true,
+      tokenAI: true,
+      name: true
+    }
+  });
+
+  if (!adminShopUser) {
+    throw new NotFoundException(`Admin shop not found for tenant ${targetTenantId}`);
+  }
+
+  // Tính toán token mới (không để âm)
+  const newTokenBalance = Math.max(0, adminShopUser.tokenAI - tokensUsed);
+
+  console.log(`🔄 Updating tokens for admin shop ${adminShopUser.id}: ${adminShopUser.tokenAI} - ${tokensUsed} = ${newTokenBalance}`);
+
+  // Update token của admin shop
+  const updatedAdminShop = await this.prisma.user.update({
+    where: { id: adminShopUser.id },
+    data: { tokenAI: newTokenBalance },
+    select: { 
+      id: true,
+      tokenAI: true,
+      name: true,
+      email: true,
+      role: true,
+      tenantId: true
+    }
+  });
+
+  return {
+    success: true,
+    message: `Đã trừ ${tokensUsed} tokens từ admin shop. Số dư còn lại: ${newTokenBalance}`,
+    data: updatedAdminShop
+  };
+}
+
+async getTenantAdminShopTokens(tenantId?: number) {
+  const targetTenantId = tenantId || this.tenantId;
+  
+  const adminShopUser = await this.prisma.user.findFirst({
+    where: {
+      role: 'adminshop',
+      tenantId: targetTenantId
+    },
+    select: { 
+      id: true,
+      name: true,
+      email: true,
+      tokenAI: true,
+      token: true,
+      role: true,
+      tenantId: true
+    }
+  });
+
+  if (!adminShopUser) {
+    throw new NotFoundException(`Admin shop not found for tenant ${targetTenantId}`);
+  }
+
+  return {
+    success: true,
+    message: 'Lấy thông tin token của admin shop thành công',
+    data: adminShopUser
+  };
+}
+
+// Hàm kiểm tra xem admin shop có đủ token không
+async checkTenantAdminShopTokens(tokensNeeded: number, tenantId?: number) {
+  const targetTenantId = tenantId || this.tenantId;
+  
+  const adminShopUser = await this.prisma.user.findFirst({
+    where: {
+      role: 'adminshop',
+      tenantId: targetTenantId
+    },
+    select: { 
+      id: true,
+      name: true,
+      tokenAI: true
+    }
+  });
+
+  if (!adminShopUser) {
+    throw new NotFoundException(`Admin shop not found for tenant ${targetTenantId}`);
+  }
+
+  const hasEnoughTokens = adminShopUser.tokenAI >= tokensNeeded;
+
+  return {
+    success: true,
+    message: hasEnoughTokens ? 'Đủ token' : 'Không đủ token',
+    data: {
+      hasEnoughTokens,
+      currentTokens: adminShopUser.tokenAI,
+      tokensNeeded,
+      remaining: adminShopUser.tokenAI - tokensNeeded
+    }
+  };
+}
 }

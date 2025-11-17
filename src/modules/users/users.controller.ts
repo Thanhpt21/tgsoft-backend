@@ -24,16 +24,17 @@ import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly uploadService: UploadService,
   ) {}
+  
 
   // Tạo user mới
   @Post()
-
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('create_users')
   @UseInterceptors(FileInterceptor('avatar'))
   async createUser(
@@ -44,6 +45,7 @@ export class UsersController {
   }
 
   @Get('all/list')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('read_all_users')
   async getAllUsers(@Query('search') search: string = '') {
     return await this.usersService.getAllUsers(search);
@@ -51,6 +53,7 @@ export class UsersController {
 
   // Lấy danh sách user, có phân trang và search
   @Get()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('read_users')
   async getUsers(
     @Query('page') page: number = 1,
@@ -60,8 +63,30 @@ export class UsersController {
     return await this.usersService.getUsers(+page, +limit, search);
   }
 
+  
+  @Get('tenant/admin-shop')
+  async getTenantAdminShop() {
+    return this.usersService.getTenantAdminShop();
+  }
+
+  @Get('tenant/admin-shop/tokens')
+  async getTenantAdminShopTokens() {
+    return this.usersService.getTenantAdminShopTokens();
+  }
+
+  @Put('tenant/admin-shop/tokens')
+  async updateTenantAdminShopTokens(@Body() body: { tokensUsed: number }) {
+    return this.usersService.updateTenantAdminShopTokens(body.tokensUsed);
+  }
+
+  @Post('tenant/admin-shop/check-tokens')
+  async checkTenantAdminShopTokens(@Body() body: { tokensNeeded: number }) {
+    return this.usersService.checkTenantAdminShopTokens(body.tokensNeeded);
+  }
+
   // Lấy user theo id
   @Get(':id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('get_a_users')
   async getUserById(@Param('id', ParseIntPipe) id: number) {
     return await this.usersService.getUserById(id);
@@ -69,6 +94,7 @@ export class UsersController {
 
   // Cập nhật user
   @Put(':id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('update_users')
   @UseInterceptors(FileInterceptor('avatar'))
   async updateUser(
@@ -82,6 +108,7 @@ export class UsersController {
 
   // Xoá user (chỉ admin mới được phép)
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('delete_users')
   async deleteUser(@Param('id', ParseIntPipe) id: number) {
     return await this.usersService.deleteUser(id);
