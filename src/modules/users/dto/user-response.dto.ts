@@ -1,4 +1,4 @@
-import { User } from '@prisma/client';
+import { User, UserTag } from '@prisma/client';
 
 export class UserResponseDto {
   id: number;
@@ -13,10 +13,14 @@ export class UserResponseDto {
   createdAt: Date;
   updatedAt: Date;
   tenantId?: number;
-  conversationId: number | null;  // Thêm trường conversationId
+  conversationId: number | null;
   tokenAI?: number;
+  defaultTokens?: number; 
+  fixedTokens?: number;
+  chatEnabled: boolean;
+  tag: UserTag | null;
 
-  constructor(user: User, conversationId: number | null = null) {  // Nhận conversationId từ ngoài
+  constructor(user: User, conversationId: number | null = null) {
     this.id = user.id;
     this.name = user.name;
     this.email = user.email;
@@ -29,7 +33,11 @@ export class UserResponseDto {
     this.createdAt = user.createdAt;
     this.updatedAt = user.updatedAt;
     this.tenantId = user.tenantId ?? undefined;
-    this.conversationId = conversationId;  // Gán conversationId
+    this.conversationId = conversationId;
     this.tokenAI = user.tokenAI ?? undefined;
+    this.defaultTokens = user.defaultTokens ?? undefined;
+    this.fixedTokens = user.fixedTokens ?? undefined;
+    this.chatEnabled = user.chatEnabled ?? true;
+    this.tag = user.tag ?? null; 
   }
 }

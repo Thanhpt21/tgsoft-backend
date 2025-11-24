@@ -20,6 +20,10 @@ export class AuditLogService {
     limit = 10,
     search?: string,
     tenantId?: number,
+    // Thêm params mới để filter token actions
+    tokenActionsOnly?: boolean,
+    userId?: number,
+    action?: string | string[]
   ) {
     const skip = (page - 1) * limit;
 
@@ -34,6 +38,30 @@ export class AuditLogService {
               ],
             }
           : {},
+        // Filter chỉ các action token nếu được yêu cầu
+        tokenActionsOnly
+          ? {
+              action: {
+                in: [
+                  'MONTHLY_TOKEN_RENEW',
+                  'FIXED_TOKENS_TRANSFER', 
+                  'FIXED_TOKENS_TRANSFER_REALTIME',
+                  'TOKEN_PURCHASE',
+                  'TOKEN_UPDATE'
+                ]
+              }
+            }
+          : {},
+        // Filter theo userId nếu có
+        userId ? { userId } : {},
+        // Filter theo action cụ thể nếu có
+        action 
+          ? { 
+              action: Array.isArray(action) 
+                ? { in: action } 
+                : { equals: action } 
+            } 
+          : {},
       ],
     };
 
@@ -43,9 +71,8 @@ export class AuditLogService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        // Include user relationship if it exists
         include: {
-          user: true, // Include user data (assuming your relation is with 'user')
+          user: true,
         },
       }),
       this.prisma.auditLog.count({ where }),
@@ -63,6 +90,22 @@ export class AuditLogService {
     };
   }
 
+  // Hàm mới: Chỉ lấy lịch sử token
+  async findTokenHistory(
+    userId?: number,
+    page = 1,
+    limit = 10
+  ) {
+    return this.findAll(
+      page,
+      limit,
+      undefined, // search
+      undefined, // tenantId
+      true,      // tokenActionsOnly
+      userId     // userId
+    );
+  }
+
   async findOne(id: number) {
     const log = await this.prisma.auditLog.findUnique({ where: { id } });
     if (!log) {
@@ -75,21 +118,43 @@ export class AuditLogService {
     };
   }
 
-  async getFormattedLogs(page?: number, limit?: number) {
+  async getFormattedLogs(
+    page?: number, 
+    limit?: number,
+    tokenActionsOnly?: boolean,
+    userId?: number
+  ) {
+    const where: Prisma.AuditLogWhereInput = {
+      // Filter chỉ token actions nếu được yêu cầu
+      ...(tokenActionsOnly && {
+        action: {
+          in: [
+            'MONTHLY_TOKEN_RENEW',
+            'FIXED_TOKENS_TRANSFER',
+            'FIXED_TOKENS_TRANSFER_REALTIME',
+            'TOKEN_PURCHASE',
+            'TOKEN_UPDATE'
+          ]
+        }
+      }),
+      // Filter theo userId nếu có
+      ...(userId && { userId })
+    };
+
     const logs = await this.prisma.auditLog.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       skip: page && limit ? (page - 1) * limit : undefined,
       take: limit,
-      // Include user relationship to fetch 'user' data
       include: {
-        user: true, // Assuming this is your user relationship
+        user: true,
       },
     });
 
     // Map sang AuditLogEntry với userId
     const entries = logs.map(log => ({
       id: log.id,
-      userId: log.user?.id ?? null, // Ensure you access userId through user relation
+      userId: log.user?.id ?? null,
       action: log.action,
       resource: log.resource,
       resourceId: log.resourceId,
@@ -100,5 +165,10 @@ export class AuditLogService {
     }));
 
     return formatAuditLogs(entries);
+  }
+
+  // Hàm mới: Lấy formatted token history
+  async getFormattedTokenHistory(userId?: number, page?: number, limit?: number) {
+    return this.getFormattedLogs(page, limit, true, userId);
   }
 }

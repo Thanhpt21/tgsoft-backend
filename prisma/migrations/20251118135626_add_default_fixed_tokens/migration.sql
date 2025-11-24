@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "defaultTokens" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "fixedTokens" INTEGER NOT NULL DEFAULT 0;

@@ -41,6 +41,8 @@ export class UsersService extends TenantAwareService {
       password: hashedPassword,
       role, 
       avatar,
+      chatEnabled: true,
+      tag: null,
     };
 
 
@@ -73,28 +75,193 @@ async getUsers(page = 1, limit = 10, search = '') {
   const userRole = this.request.user?.role;
   let where: Prisma.UserWhereInput = {};
 
-  if (userRole === 'admin') {
-    where = {
-      ...(search
-        ? {
-            OR: [
-              { name: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
-              { email: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
-            ],
-          }
-        : {}),
-    };
-  } else {
+  // Phân quyền - chỉ admin shop mới được xem
+  if (userRole === 'adminshop') {
     where = {
       tenantId: this.tenantId,
-      ...(search
-        ? {
-            OR: [
-              { name: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
-              { email: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
-            ],
+      // CHỈ lấy users CHƯA CÓ ROLE trong tenant này
+      userTenantRoles: {
+        none: {
+          tenantId: this.tenantId
+        }
+      },
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      } : {}),
+    };
+  } else {
+    throw new Error('Unauthorized');
+  }
+
+  const [users, total] = await this.prisma.$transaction([
+    this.prisma.user.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        isActive: true,
+        type_account: true,
+        tokenAI: true,
+        role: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
+        chatEnabled: true, 
+        tag: true,      
+        chatConversations: {
+          select: { id: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+        orders: {
+          select: {
+            id: true,
+            totalAmount: true,
+            status: true,
+            createdAt: true
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        },
+        userTenantRoles: {
+          where: {
+            tenantId: this.tenantId
+          },
+          select: {
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            },
+            tenantId: true
           }
-        : {}),
+        }
+      },
+    }),
+    this.prisma.user.count({ where }),
+  ]);
+
+  // Lấy thống kê
+  const userIds = users.map(user => user.id);
+  
+  const [messageCounts, orderCounts] = await Promise.all([
+    this.prisma.chatMessage.groupBy({
+      by: ['conversationId'],
+      where: {
+        conversation: {
+          userId: { in: userIds }
+        }
+      },
+      _count: { id: true }
+    }),
+    
+    this.prisma.order.groupBy({
+      by: ['userId'],
+      where: {
+        userId: { in: userIds }
+      },
+      _count: { id: true }
+    })
+  ]);
+
+  // Gộp dữ liệu
+  const usersWithStats = users.map((user) => {
+    const conversationId = user.chatConversations.length > 0 ? user.chatConversations[0].id : null;
+    
+    const userMessageCount = messageCounts
+      .filter(msg => user.chatConversations.some(conv => conv.id === msg.conversationId))
+      .reduce((total, msg) => total + msg._count.id, 0);
+
+    const userOrderCount = orderCounts.find(order => order.userId === user.id)?._count.id || 0;
+
+    const totalOrderValue = user.orders.reduce((total, order) => {
+      return total + order.totalAmount;
+    }, 0);
+
+    const userRoles = user.userTenantRoles.map(utr => utr.role);
+
+    return {
+      ...user,
+      conversationId,
+      stats: {
+        totalMessages: userMessageCount,
+        totalOrders: userOrderCount,
+        totalOrderValue,
+        recentOrdersCount: user.orders.length,
+        avgOrderValue: user.orders.length > 0 ? Math.round(totalOrderValue / user.orders.length) : 0
+      },
+      recentOrders: user.orders.map(order => ({
+        id: order.id,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        createdAt: order.createdAt
+      })),
+      roles: userRoles,
+      hasRole: false // Luôn là false vì đây là API lấy users chưa có role
+    };
+  });
+
+  return {
+    success: true,
+    message: 'Lấy danh sách người dùng chưa có role thành công',
+    data: {
+      data: usersWithStats,
+      total,
+      page,
+      pageCount: Math.ceil(total / limit),
+    },
+  };
+}
+
+async getUsersWithRole(page = 1, limit = 10, search = '', roleName?: string) {
+  const skip = (page - 1) * limit;
+
+  const userRole = this.request.user?.role;
+  let where: Prisma.UserWhereInput = {};
+
+  // Phân quyền - chỉ admin shop mới được xem
+  if (userRole === 'adminshop') {
+    where = {
+      tenantId: this.tenantId,
+      // CHỈ lấy users CÓ ROLE trong tenant này
+      userTenantRoles: {
+        some: {
+          tenantId: this.tenantId
+        }
+      },
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      } : {}),
+    };
+  } else {
+    throw new Error('Unauthorized');
+  }
+
+  // Nếu có filter theo role name cụ thể
+  if (roleName) {
+    where = {
+      ...where,
+      userTenantRoles: {
+        some: {
+          tenantId: this.tenantId,
+          role: {
+            name: roleName
+          }
+        }
+      }
     };
   }
 
@@ -116,41 +283,115 @@ async getUsers(page = 1, limit = 10, search = '') {
         tenantId: true,
         createdAt: true,
         updatedAt: true,
-        // Lấy chatConversations và thêm conversationId
+        chatEnabled: true, 
+        tag: true,      
         chatConversations: {
-          select: {
-            id: true,  // Chỉ lấy ID của cuộc trò chuyện (conversationId)
-          },
-          take: 1,  // Chỉ lấy một cuộc trò chuyện gần nhất, bạn có thể thay đổi nếu cần
+          select: { id: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
         },
+        orders: {
+          select: {
+            id: true,
+            totalAmount: true,
+            status: true,
+            createdAt: true
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        },
+        userTenantRoles: {
+          where: {
+            tenantId: this.tenantId
+          },
+          select: {
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            },
+            tenantId: true
+          }
+        }
       },
     }),
     this.prisma.user.count({ where }),
   ]);
 
-  // Xử lý dữ liệu và thêm conversationId vào response
-  const usersWithConversation = users.map((user) => {
-    // Kiểm tra xem người dùng có chatConversations không
+  // Lấy thống kê
+  const userIds = users.map(user => user.id);
+  
+  const [messageCounts, orderCounts] = await Promise.all([
+    this.prisma.chatMessage.groupBy({
+      by: ['conversationId'],
+      where: {
+        conversation: {
+          userId: { in: userIds }
+        }
+      },
+      _count: { id: true }
+    }),
+    
+    this.prisma.order.groupBy({
+      by: ['userId'],
+      where: {
+        userId: { in: userIds }
+      },
+      _count: { id: true }
+    })
+  ]);
+
+  // Gộp dữ liệu
+  const usersWithStats = users.map((user) => {
     const conversationId = user.chatConversations.length > 0 ? user.chatConversations[0].id : null;
     
+    const userMessageCount = messageCounts
+      .filter(msg => user.chatConversations.some(conv => conv.id === msg.conversationId))
+      .reduce((total, msg) => total + msg._count.id, 0);
+
+    const userOrderCount = orderCounts.find(order => order.userId === user.id)?._count.id || 0;
+
+    const totalOrderValue = user.orders.reduce((total, order) => {
+      return total + order.totalAmount;
+    }, 0);
+
+    const userRoles = user.userTenantRoles.map(utr => utr.role);
+
     return {
       ...user,
-      conversationId,  // Thêm conversationId vào dữ liệu user
+      conversationId,
+      stats: {
+        totalMessages: userMessageCount,
+        totalOrders: userOrderCount,
+        totalOrderValue,
+        recentOrdersCount: user.orders.length,
+        avgOrderValue: user.orders.length > 0 ? Math.round(totalOrderValue / user.orders.length) : 0
+      },
+      recentOrders: user.orders.map(order => ({
+        id: order.id,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        createdAt: order.createdAt
+      })),
+      roles: userRoles,
+      hasRole: true // Luôn là true vì đây là API lấy users có role
     };
   });
 
   return {
     success: true,
-    message: 'Lấy danh sách người dùng thành công',
+    message: 'Lấy danh sách người dùng có role thành công',
     data: {
-      data: usersWithConversation,  // Dữ liệu đã có conversationId
+      data: usersWithStats,
       total,
       page,
       pageCount: Math.ceil(total / limit),
+      filter: roleName || 'all-roles'
     },
   };
 }
-
 
   async getAllUsers(search = '') {
     const userRole = this.request.user?.role;
@@ -420,4 +661,149 @@ async checkTenantAdminShopTokens(tokensNeeded: number, tenantId?: number) {
     }
   };
 }
+
+async toggleUserChat(userId: number, enabled: boolean) {
+  const user = await this.prisma.user.findFirst({
+    where: {
+      id: userId,
+      tenantId: this.tenantId // Chỉ admin shop mới được toggle users trong tenant của họ
+    }
+  });
+
+  if (!user) {
+    throw new NotFoundException('User not found in this tenant');
+  }
+
+  const updatedUser = await this.prisma.user.update({
+    where: { id: userId },
+    data: { chatEnabled: enabled }
+  });
+
+  return {
+    success: true,
+    message: `Đã ${enabled ? 'bật' : 'tắt'} chat cho người dùng ${user.name}`,
+    data: new UserResponseDto(updatedUser)
+  };
+}
+
+async getUserChatStatus(userId: number) {
+  const user = await this.prisma.user.findFirst({
+    where: {
+      id: userId,
+      tenantId: this.tenantId
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      chatEnabled: true
+    }
+  });
+
+  if (!user) {
+    throw new NotFoundException('User not found in this tenant');
+  }
+
+  return {
+    success: true,
+    message: 'Lấy trạng thái chat thành công',
+    data: user
+  };
+}
+
+async updateUserTag(userId: number, tag: string | null) {
+  const user = await this.prisma.user.findFirst({
+    where: {
+      id: userId,
+      tenantId: this.tenantId
+    }
+  });
+
+  if (!user) {
+    throw new NotFoundException('User not found in this tenant');
+  }
+
+  const updatedUser = await this.prisma.user.update({
+    where: { id: userId },
+    data: { tag: tag as any } // Ép kiểu sang UserTag enum
+  });
+
+  return {
+    success: true,
+    message: tag ? `Đã gán tag "${tag}" cho người dùng` : 'Đã xóa tag của người dùng',
+    data: new UserResponseDto(updatedUser)
+  };
+}
+
+async getAdminShopUsers(
+  page: number = 1, 
+  limit: number = 10, 
+  search: string = ''
+) {
+  const skip = (page - 1) * limit;
+
+  const where: any = {
+    role: 'adminshop'
+  };
+
+  // Thêm search nếu có
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+      { tenant: { name: { contains: search, mode: 'insensitive' } } }
+    ];
+  }
+
+  const [adminShopUsers, total] = await this.prisma.$transaction([
+    this.prisma.user.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        isActive: true,
+        type_account: true,
+        tokenAI: true,
+         defaultTokens: true, 
+        fixedTokens: true,   
+        token: true,
+        role: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
+        chatEnabled: true,
+        tag: true,
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true
+          }
+        },
+      }
+    }),
+    this.prisma.user.count({ where })
+  ]);
+
+  if (adminShopUsers.length === 0) {
+    throw new NotFoundException('No admin shop users found');
+  }
+
+  return {
+    success: true,
+    message: `Lấy danh sách admin shop thành công`,
+    data: {
+      data: adminShopUsers,
+      total,
+      page,
+      pageCount: Math.ceil(total / limit),
+    }
+  };
+}
+
 }

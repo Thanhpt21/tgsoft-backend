@@ -63,6 +63,59 @@ export class UsersController {
     return await this.usersService.getUsers(+page, +limit, search);
   }
 
+  // Lấy danh sách user CÓ ROLE, có phân trang và search
+  @Get('with-role')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('read_users')
+  async getUsersWithRole(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+    @Query('roleName') roleName?: string,
+  ) {
+    return await this.usersService.getUsersWithRole(+page, +limit, search, roleName);
+  }
+
+  @Get('admin-shop/list')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('read_users')
+  async getAdminShopUsers(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ) {
+    return await this.usersService.getAdminShopUsers(+page, +limit, search);
+  }
+
+
+  @Put(':id/toggle-chat')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('update_users')
+  async toggleUserChat(
+    @Param('id') userId: string,
+    @Body() body: { enabled: boolean }
+  ) {
+    return await this.usersService.toggleUserChat(+userId, body.enabled);
+  }
+
+  @Get(':id/chat-status')
+  @UseGuards(JwtAuthGuard)
+  async getUserChatStatus(@Param('id') userId: string) {
+    return await this.usersService.getUserChatStatus(+userId);
+  }
+  
+  @Put(':id/tag')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('update_users')
+  async updateUserTag(
+    @Param('id') userId: string,
+    @Body() body: { tag: string | null }
+  ) {
+    return await this.usersService.updateUserTag(+userId, body.tag);
+  }
+
+
+
   
   @Get('tenant/admin-shop')
   async getTenantAdminShop() {

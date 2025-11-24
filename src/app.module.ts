@@ -44,6 +44,8 @@ import { ProductReviewModule } from './modules/product-review/product-review.mod
 import { ShippingAddressModule } from './modules/shipping-address/shipping-address.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
 import { PromotionProductModule } from './modules/promotion-product/promotion-product.module';
+import { SupportMailboxModule } from './modules/support-mailbox/support-mailbox.module';
+import { TokenModule } from './modules/token/token.module';
 
 
 
@@ -91,7 +93,9 @@ import { PromotionProductModule } from './modules/promotion-product/promotion-pr
     ProductReviewModule,
     ShippingAddressModule,
     PromotionModule,
-    PromotionProductModule
+    PromotionProductModule,
+    SupportMailboxModule,
+    TokenModule
   ],
   controllers: [AppController],
    providers: [
@@ -144,6 +148,8 @@ export class AppModule implements NestModule {
       'shipping-addresses',
       'promotions',
       'promotion-products',
+      'support-mailbox',
+      'token'
     );
   }
 }

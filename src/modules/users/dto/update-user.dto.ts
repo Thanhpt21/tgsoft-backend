@@ -48,4 +48,12 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   token?: string;
+
+  @IsOptional()
+  @IsNumber()
+  defaultTokens?: number; // Token mặc định (renew hàng tháng)
+
+  @IsOptional()
+  @IsNumber()
+  fixedTokens?: number; // Token cố định (không bị reset)
 }

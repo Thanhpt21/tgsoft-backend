@@ -5,6 +5,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
+import { OrderStatus } from '@prisma/client';
 
 @Controller('orders')
 export class OrdersController {
@@ -30,6 +31,40 @@ export class OrdersController {
     ) {
         return this.ordersService.getOrders(+page, +limit, userId ? +userId : undefined, status, search);
     }
+
+  @Get('statistics/revenue')
+  async getTotalRevenue(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('status') status?: OrderStatus
+  ) {
+    return this.ordersService.getTotalRevenue(startDate, endDate, status);
+  }
+
+  @Get('statistics/orders')
+  async getTotalOrders(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('status') status?: OrderStatus
+  ) {
+    return this.ordersService.getTotalOrders(startDate, endDate, status);
+  }
+
+  @Get('statistics/sales')
+  async getSalesStatistics(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string
+  ) {
+    return this.ordersService.getSalesStatistics(startDate, endDate);
+  }
+
+  @Get('statistics/monthly-revenue')
+  @UseGuards(JwtAuthGuard)
+  async getMonthlyRevenue(
+    @Query('year') year?: number
+  ) {
+    return this.ordersService.getMonthlyRevenue(year ? +year : undefined);
+  }
 
     // Lấy đơn hàng của một người dùng
   @Get('user/:userId')

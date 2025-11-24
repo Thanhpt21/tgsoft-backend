@@ -42,4 +42,12 @@ export class CreateUserDto {
   @IsOptional()
   @IsNumber()
   tokenAI?: number;
+
+  @IsOptional()
+  @IsNumber()
+  defaultTokens?: number; // Token mặc định (renew hàng tháng)
+
+  @IsOptional()
+  @IsNumber()
+  fixedTokens?: number; // Token cố định (không bị reset)
 }

@@ -20,12 +20,16 @@ model User {
   isActive              Boolean                @default(true)
   type_account          String                 @default("normal")
   tokenAI               Int                    @default(0)
-  token                 String?                    
+  defaultTokens         Int                    @default(0) // Token mặc định (renew hàng tháng)
+  fixedTokens           Int                    @default(0) // Token cố định (không bị reset)
+  token                 String?                // bearer token gọi API CHAT
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   tenantId              Int?
   resetToken            String?
   resetTokenExpiry      DateTime?
+  chatEnabled           Boolean                @default(true)
+  tag                   UserTag?
   auditLogs             AuditLog[]
   blogs                 Blog[]
   carts                 Cart?
@@ -38,7 +42,10 @@ model User {
   shippingAddresses     ShippingAddress[]
   tenant                Tenant?                @relation(fields: [tenantId], references: [id])
   userTenantRoles       UserTenantRole[]
+  createdSupportMailboxes SupportMailbox[]     @relation("SupportCreated")
+  repliedSupportMailboxes SupportMailbox[]     @relation("AdminReplies")
 }
+
 
 model Tenant {
   id                     Int                    @id @default(autoincrement())
@@ -84,6 +91,7 @@ model Tenant {
   Promotion              Promotion[]
   shipments              Shipment[]
   shippingAddresses      ShippingAddress[]
+  supportMailboxes       SupportMailbox[]
   users                  User[]
   userTenantRoles        UserTenantRole[]
   warehouses             Warehouse[]
@@ -721,6 +729,50 @@ model PromotionProduct {
   giftProduct Product?  @relation("PromotionProduct_GiftProduct", fields: [giftProductId], references: [id])
 }
 
+model SupportMailbox {
+  id          Int         @id @default(autoincrement())
+  title       String      // Tiêu đề yêu cầu
+  description String?     // Mô tả chi tiết lỗi
+  images      Json?       // Danh sách hình ảnh
+  status      SupportStatus @default(PENDING) // Trạng thái yêu cầu
+  
+  // Phản hồi từ Aiban (admin)
+  adminReply  String?
+  repliedAt   DateTime?
+  repliedBy   Int?        // ID admin phản hồi
+  replier     User?       @relation("AdminReplies", fields: [repliedBy], references: [id])
+  
+  // Phản hồi từ shop
+  shopReply   String?
+  shopRepliedAt DateTime?
+  
+  // Theo dõi
+  createdBy   Int
+  tenantId    Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  // Relations
+  creator     User        @relation("SupportCreated", fields: [createdBy], references: [id])
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([createdBy])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Enum cho trạng thái
+enum SupportStatus {
+  PENDING     // Đang chờ
+  IN_PROGRESS // Đang xử lý
+  RESOLVED    // Đã giải quyết
+  CLOSED      // Đã đóng
+  CANCELLED   // Đã hủy
+}
+
+
+
 enum DiscountType {
   PERCENT
   FIXED
@@ -752,6 +804,7 @@ enum ReceiverType {
   DISTRIBUTOR
   VENDOR
 }
+
 
 enum PayoutStatus {
   PENDING
@@ -786,6 +839,14 @@ enum ShippingService {
   STANDARD
   EXPRESS
   OVERNIGHT
+}
+
+enum UserTag {
+  POTENTIAL      // Tiềm năng
+  VIP            // VIP  
+  SPAM           // Spam
+  NEW_CUSTOMER   // Khách mới
+  NEED_CARE      // Cần quan tâm
 }
 
 enum OrderStatus {
