@@ -18,15 +18,22 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  // 🔥 SỬA CORS - THÊM HEADERS VNPAY
   app.enableCors({
     origin: true,
     methods: 'GET,POST,PUT,DELETE,OPTIONS,PATCH',
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'x-tenant-id',
+      'vnp-tmn-code',    // 🔥 THÊM HEADERS VNPAY
+      'vnp-secret',      // 🔥 THÊM HEADERS VNPAY  
+      'vnp-api-url',     // 🔥 THÊM HEADERS VNPAY
+    ],
     credentials: true,
   });
 
   app.setGlobalPrefix('api');
-
 
   await app.listen(port);
 

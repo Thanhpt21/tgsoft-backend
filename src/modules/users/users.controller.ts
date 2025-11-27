@@ -147,8 +147,7 @@ export class UsersController {
 
   // Cập nhật user
   @Put(':id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('update_users')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('avatar'))
   async updateUser(
     @Param('id', ParseIntPipe) id: number,

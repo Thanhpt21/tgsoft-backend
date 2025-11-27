@@ -13,6 +13,7 @@ import {
   BadRequestException,
   ValidationPipe,
   Res,
+  Headers, // 🔥 THÊM Headers
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -46,6 +47,7 @@ export class PaymentsController {
     @Query('orderId') orderIdStr: string,
     @Query('amount') amountStr: string,
     @Query('returnUrl') returnUrl: string,
+    @Headers() headers: any, // 🔥 NHẬN headers từ frontend
   ) {
     if (!orderIdStr || !amountStr || !returnUrl) {
       throw new BadRequestException('Thiếu tham số bắt buộc');
@@ -68,16 +70,42 @@ export class PaymentsController {
       throw new BadRequestException('returnUrl không hợp lệ');
     }
 
-    const url = this.vnpayService.createPaymentUrl(orderId, amount, returnUrl);
+    // 🔥 LẤY config từ headers frontend gửi lên
+    const vnpayConfig = {
+      tmnCode: headers['vnp-tmn-code'] || process.env.VNP_TMN_CODE,
+      secretKey: headers['vnp-secret'] || process.env.VNP_SECRET,
+      vnpUrl: headers['vnp-api-url'] || process.env.VNP_API_URL,
+    };
+
+    // 🔥 TRUYỀN config vào service
+    const url = this.vnpayService.createPaymentUrl(
+      orderId, 
+      amount, 
+      returnUrl,
+      vnpayConfig // 🔥 TRUYỀN config
+    );
     
     return { success: true, url };
   }
 
   // Callback từ VNPay sau khi thanh toán
   @Get('vnpay/callback')
-  async handleVnpayReturn(@Query() query: any, @Res() res: Response) {
+  async handleVnpayReturn(
+    @Query() query: any, 
+    @Res() res: Response,
+    @Headers() headers: any, // 🔥 NHẬN headers để verify
+  ) {
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    const result = this.vnpayService.verifyReturnUrl(query);
+    
+    // 🔥 LẤY config từ headers để verify
+    const vnpayConfig = {
+      tmnCode: headers['vnp-tmn-code'] || process.env.VNP_TMN_CODE,
+      secretKey: headers['vnp-secret'] || process.env.VNP_SECRET,
+      vnpUrl: headers['vnp-api-url'] || process.env.VNP_API_URL,
+    };
+
+    // 🔥 TRUYỀN config vào service
+    const result = this.vnpayService.verifyReturnUrl(query, vnpayConfig);
 
     // Kiểm tra tính hợp lệ của chữ ký
     if (!result.isValid) {

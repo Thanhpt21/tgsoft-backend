@@ -2,20 +2,32 @@ import * as qs from 'qs';
 import * as crypto from 'crypto';
 import { Injectable } from '@nestjs/common';
 
+export interface VnpayConfig {
+  tmnCode: string;
+  secretKey: string;
+  vnpUrl: string;
+}
+
 @Injectable()
 export class VnpayService {
-  private tmnCode = process.env.VNP_TMN_CODE!;
-  private secretKey = process.env.VNP_SECRET!;
-  private vnpUrl = process.env.VNP_API_URL!;
+  // 🔥 XÓA config cố định từ .env
+  // private tmnCode = process.env.VNP_TMN_CODE!;
+  // private secretKey = process.env.VNP_SECRET!;
+  // private vnpUrl = process.env.VNP_API_URL!;
 
-  createPaymentUrl(orderId: number, amount: number, returnUrl: string) {
+  createPaymentUrl(
+    orderId: number, 
+    amount: number, 
+    returnUrl: string,
+    config: VnpayConfig // 🔥 NHẬN config từ bên ngoài
+  ) {
     const date = new Date();
     const createDate = this.formatDate(date);
 
     let vnp_Params: any = {};
     vnp_Params['vnp_Version'] = '2.1.0';
     vnp_Params['vnp_Command'] = 'pay';
-    vnp_Params['vnp_TmnCode'] = this.tmnCode;
+    vnp_Params['vnp_TmnCode'] = config.tmnCode; // 🔥 DÙNG config từ parameter
     vnp_Params['vnp_Locale'] = 'vn';
     vnp_Params['vnp_CurrCode'] = 'VND';
     vnp_Params['vnp_TxnRef'] = orderId.toString();
@@ -29,16 +41,19 @@ export class VnpayService {
     vnp_Params = this.sortObject(vnp_Params);
 
     const signData = qs.stringify(vnp_Params, { encode: false });
-    const hmac = crypto.createHmac('sha512', this.secretKey);
+    const hmac = crypto.createHmac('sha512', config.secretKey); // 🔥 DÙNG config
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
     vnp_Params['vnp_SecureHash'] = signed;
 
-    const paymentUrl = this.vnpUrl + '?' + qs.stringify(vnp_Params, { encode: false });
+    const paymentUrl = config.vnpUrl + '?' + qs.stringify(vnp_Params, { encode: false }); // 🔥 DÙNG config
     return paymentUrl;
   }
 
   // Verify callback từ VNPay
-  verifyReturnUrl(vnpParams: Record<string, string>) {
+  verifyReturnUrl(
+    vnpParams: Record<string, string>,
+    config: VnpayConfig // 🔥 NHẬN config để verify
+  ) {
     const secureHash = vnpParams['vnp_SecureHash'];
     delete vnpParams['vnp_SecureHash'];
     delete vnpParams['vnp_SecureHashType'];
@@ -46,7 +61,7 @@ export class VnpayService {
     const sortedParams = this.sortObject(vnpParams);
     const signData = qs.stringify(sortedParams, { encode: false });
     const checkSum = crypto
-      .createHmac('sha512', this.secretKey)
+      .createHmac('sha512', config.secretKey) // 🔥 DÙNG config
       .update(signData)
       .digest('hex');
 
