@@ -30,7 +30,6 @@ export class ShippingController {
 
   @Post('webhook')
   async handleWebhook(@Body() dto: TrackingUpdateDto) {
-    console.log('📦 Webhook nhận được:', dto);
 
     const rawData = {
       location: dto.location,

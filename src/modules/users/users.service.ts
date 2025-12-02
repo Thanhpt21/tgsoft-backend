@@ -575,7 +575,6 @@ async updateTenantAdminShopTokens(tokensUsed: number, tenantId?: number) {
   // Tính toán token mới (không để âm)
   const newTokenBalance = Math.max(0, adminShopUser.tokenAI - tokensUsed);
 
-  console.log(`🔄 Updating tokens for admin shop ${adminShopUser.id}: ${adminShopUser.tokenAI} - ${tokensUsed} = ${newTokenBalance}`);
 
   // Update token của admin shop
   const updatedAdminShop = await this.prisma.user.update({

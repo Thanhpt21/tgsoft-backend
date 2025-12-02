@@ -90,7 +90,6 @@ async createGHTKOrder(orderId: number) {
       0
     );
 
-    console.log('Tổng trọng lượng (kg):', totalWeightKg);
     if (totalWeightKg >= 20) {
       throw new BadRequestException(
         `Đơn hàng nặng ${totalWeightKg}kg ≥ 20kg, GHTK không nhận`
@@ -163,11 +162,7 @@ async createGHTKOrder(orderId: number) {
       },
     };
 
-    // LOG DEBUG
-    console.log('GHTK Payload:', JSON.stringify(ghtkPayload, null, 2));
-    console.log('Tổng tiền hàng (value/cod):', totalProductValue);
-    console.log('Tổng trọng lượng (kg):', totalWeightKg);
-    console.log('Địa chỉ nhận:', finalReceiverAddress);
+
 
     // 5. GỬI REQUEST
     const response = await this.httpService
@@ -193,7 +188,7 @@ async createGHTKOrder(orderId: number) {
       throw new BadRequestException(response.data.message || 'Tạo đơn GHTK thất bại');
     }
 
-    console.log('GHTK ORDER CREATED:', response.data);
+
 
     // 7. CẬP NHẬT TRẠNG THÁI
     if (response.data.order?.tracking_id) {

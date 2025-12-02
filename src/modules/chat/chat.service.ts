@@ -284,7 +284,6 @@ async createGuestConversation(sessionId: string, tenantId: number) {
     try {
       // === 1️⃣ Validate input ===
       const trimmed = message?.trim();
-      console.log('📥 Client sent message:', { userId, tenantId, conversationId, message, sessionId, metadata });
       if (!trimmed) throw new Error('Message cannot be empty');
       if (trimmed.length > 5000) throw new Error('Message too long (max 5000 chars)');
 

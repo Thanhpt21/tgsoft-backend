@@ -62,13 +62,11 @@ export class UploadService {
         const bucketPath = `/storage/v1/object/public/${this.bucketName}/`;
         
         if (!imageUrl.includes(bucketPath)) {
-          console.log('⚠️ URL không phải từ Supabase bucket, bỏ qua xóa:', imageUrl);
           return;
         }
 
         const parts = imageUrl.split(bucketPath);
         if (parts.length < 2 || !parts[1]) {
-          console.log('⚠️ Không thể parse URL, bỏ qua xóa:', imageUrl);
           return;
         }
         
@@ -78,7 +76,6 @@ export class UploadService {
         filePath = imageUrl.replace(/^\/+/, ''); // Xóa dấu / đầu nếu có
       }
 
-      console.log('🗑️ Đang xóa file:', filePath);
 
       const { error } = await this.supabase.storage
         .from(this.bucketName)
