@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { TenantAwareService } from 'src/common/services/tenant-aware.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -6,10 +6,10 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { REQUEST } from '@nestjs/core';
 import type { Request } from 'express';
-import { slugify } from 'src/utils/slugify';
 import { Prisma } from '@prisma/client';
 import { UploadService } from '../upload/upload.service';
 import { ValidationHelper } from 'src/core/helpers/validation.helper';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class ProductService extends TenantAwareService {
@@ -651,6 +651,89 @@ async updateProduct(
       error: error instanceof Error ? error.message : String(error),
     };
   }
+  }
+
+  async exportProducts() {
+    try {
+      // Lấy tất cả sản phẩm từ database
+      const products = await this.prisma.product.findMany({
+        where: {
+          tenantId: this.tenantId,
+        },
+        include: {
+          category: {
+            select: {
+              name: true,
+            },
+          },
+          brand: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Format data để export - chỉ những field cần thiết
+       // Format data để export
+      const exportData = products.map(product => ({
+        'Tên sản phẩm': product.name,
+        'Slug': product.slug,
+        'Mô tả': product.description || '',
+        'Giá': product.basePrice,
+        'Cân nặng (kg)': product.weight || '',
+        'Chiều dài (cm)': product.length || '',
+        'Chiều rộng (cm)': product.width || '',
+        'Chiều cao (cm)': product.height || '',
+        'Danh mục': product.category?.name || '',
+        'Thương hiệu': product.brand?.name || '',
+        'Trạng thái': product.isPublished ? 'ACTIVE' : 'INACTIVE',
+        'Ngày tạo': this.formatDate(product.createdAt),
+        'Ngày cập nhật': this.formatDate(product.updatedAt)
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+      
+      // Auto-size columns
+      const colWidths = [
+        { wch: 30 }, // Tên sản phẩm
+        { wch: 20 }, // Slug
+        { wch: 40 }, // Mô tả
+        { wch: 15 }, // Giá
+        { wch: 15 }, // Cân nặng
+        { wch: 15 }, // Chiều dài
+        { wch: 15 }, // Chiều rộng
+        { wch: 15 }, // Chiều cao
+        { wch: 20 }, // Danh mục
+        { wch: 20 }, // Thương hiệu
+        { wch: 12 }, // Trạng thái
+        { wch: 15 }, // Ngày tạo
+        { wch: 15 }, // Ngày cập nhật
+      ];
+      worksheet['!cols'] = colWidths;
+      
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      return {
+        success: true,
+        message: 'Export danh sách sản phẩm thành công',
+        data: {
+          buffer: buffer,
+          fileName: `products_export_${new Date().toISOString().split('T')[0]}.xlsx`
+        }
+      };
+    } catch (error) {
+      throw new BadRequestException('Lỗi khi export danh sách sản phẩm: ' + error.message);
+    }
+  }
+
+  // Thêm hàm helper formatDate vào class
+  private formatDate(date: Date): string {
+    if (!date) return '';
+    return date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
   }
 
 }

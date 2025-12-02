@@ -13,6 +13,7 @@ import {
   UploadedFile,
   UploadedFiles,
   UseInterceptors,
+  Res,
 } from '@nestjs/common';
 import { FileFieldsInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ProductService } from './product.service';
@@ -21,6 +22,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { PermissionsGuard } from 'src/common/guards/permissions.guard';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
+import type { Response } from 'express';
 
 @Controller('products')
 
@@ -45,6 +47,15 @@ export class ProductController {
     const thumb = files.thumb?.[0];
     const images = files.images || [];
     return this.productService.create(dto, userId, thumb, images);
+  }
+
+  @Get('export/excel')
+  async export(@Res() res: Response) {
+    const result = await this.productService.exportProducts();
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${result.data.fileName}`);
+    res.send(result.data.buffer);
   }
 
   @Get()
@@ -114,6 +125,8 @@ export class ProductController {
 
 
 
+
+
     @Get(':id')
   @Permissions('get_a_products')
   async getProductById(@Param('id', ParseIntPipe) id: number) {
@@ -151,6 +164,10 @@ export class ProductController {
   async deleteProduct(@Param('id', ParseIntPipe) id: number) {
     return this.productService.deleteProduct(id);
   }
+
+    
+
+
 
 
 }
