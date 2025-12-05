@@ -27,17 +27,3 @@ export class MigrateMessagesDto {
   @IsInt()
   tenantId: number;
 }
-
-export class GetMessagesDto {
-  @IsOptional()
-  @IsInt()
-  conversationId?: number;
-
-  @IsOptional()
-  @IsString()
-  sessionId?: string;
-
-  @IsOptional()
-  @IsInt()
-  userId?: number;
-}

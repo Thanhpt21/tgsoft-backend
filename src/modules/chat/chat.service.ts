@@ -338,34 +338,60 @@ async createGuestConversation(sessionId: string, tenantId: number) {
   /**
    * Lấy lịch sử chat từ DB
    */
-  async getConversationMessages(conversationId: number) {
-    try {
-      const id = parseInt(conversationId.toString(), 10); // Convert sang number
-    if (isNaN(id)) {
+async getConversationMessages(conversationId: number, page: number = 1, pageSize: number = 10) {
+  try {
+    // Đảm bảo conversationId là number
+    const convIdNum = Number(conversationId);
+    if (isNaN(convIdNum)) {
       throw new Error(`Invalid conversationId: ${conversationId}`);
     }
-      return await this.prisma.chatMessage.findMany({
-        where: { conversationId: id },
-        orderBy: { createdAt: 'asc' },
-        include: {
-          conversation: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  avatar: true,
-                },
+
+    const skip = (page - 1) * pageSize;
+    
+    // Lấy total count - SỬA: không dùng select phức tạp
+    const totalMessages = await this.prisma.chatMessage.count({
+      where: { conversationId: convIdNum }, // Đảm bảo là number
+    });
+    
+    // Lấy messages với pagination
+    const messages = await this.prisma.chatMessage.findMany({
+      where: { conversationId: convIdNum }, // Đảm bảo là number
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: Number(pageSize),
+      include: {
+        conversation: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true,
               },
             },
           },
         },
-      });
-    } catch (error) {
-      this.logger.error(`Error getting conversation messages for ${conversationId}:`, error);
-      throw error;
-    }
+      },
+    });
+
+    // Đảo ngược để có thứ tự cũ → mới
+    const orderedMessages = messages.reverse();
+
+    return {
+      messages: orderedMessages,
+      pagination: {
+        page,
+        pageSize,
+        total: totalMessages,
+        totalPages: Math.ceil(totalMessages / pageSize),
+        hasMore: totalMessages > page * pageSize,
+      },
+    };
+  } catch (error) {
+    this.logger.error(`Error getting conversation messages for ${conversationId}:`, error);
+    throw error;
   }
+}
 
   /**
    * Lấy messages từ Redis (guest)

@@ -12,8 +12,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
-import { GetMessagesDto, MigrateMessagesDto } from './dto/send-message.dto';
+import {MigrateMessagesDto } from './dto/send-message.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { GetMessagesDto } from './dto/get-messages.dto';
 
 @Controller('chat')
 export class ChatController {
@@ -29,12 +30,20 @@ export class ChatController {
    */
   @Get('messages')
   async getMessages(@Query() query: GetMessagesDto) {
-    const { conversationId, sessionId, userId } = query;
+    const { conversationId, sessionId, userId, page, pageSize } = query;
 
      // Lấy từ DB nếu có conversationId
-    if (conversationId) {
-      const messages = await this.chatService.getConversationMessages(conversationId);
-      return { messages };
+     if (conversationId) {
+       const convId = Number(conversationId);
+        if (isNaN(convId)) {
+          throw new BadRequestException('conversationId must be a valid number');
+        }
+      const result = await this.chatService.getConversationMessages(
+        convId, 
+        page || 1, 
+        pageSize || 10
+      );
+      return result;
     }
     
     if (userId) {
