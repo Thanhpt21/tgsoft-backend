@@ -140,81 +140,90 @@ async create(userId: number, dto: CreateOrderDto) {
 }
 
   // Lấy danh sách order (có phân trang, tìm kiếm)
-  async getOrders(
-    page = 1,
-    limit = 10,
-    userId?: number,
-    status?: string,
-    search = '',
-  ) {
-    const skip = (page - 1) * limit;
+async getOrders(
+  page = 1,
+  limit = 10,
+  userId?: number,
+  status?: string,
+  search = '',
+) {
+  const skip = (page - 1) * limit;
 
-    const where: any = {};
-    if (userId) where.userId = userId;
-    if (status) where.status = status as OrderStatus;
+  const where: any = {
+    tenantId: this.tenantId, // 🎯 THÊM ĐIỀU KIỆN TENANT
+  };
+  
+  if (userId) where.userId = userId;
+  if (status) where.status = status as OrderStatus;
 
-    // Nếu muốn tìm kiếm theo ID hoặc tên người nhận (JSON shippingInfo)
-    if (search) {
-      where.OR = [
-        { id: Number.isNaN(+search) ? undefined : +search },
-        { shippingInfo: { path: ['to', 'name'], string_contains: search } }, // Prisma 5+
-      ].filter(Boolean);
-    }
-
-    const [orders, total] = await this.prisma.$transaction([
-      this.prisma.order.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          items: {
-            include: { productVariant: { include: { product: true } } },
-          },
-          payments: true,
-          user: true,
-          paymentMethod: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.order.count({ where }),
-    ]);
-
-    return {
-      success: true,
-      message: 'Lấy danh sách order thành công',
-      data: {
-        data: orders.map((o) => new OrderResponseDto(o as any)),
-        total,
-        page,
-        pageCount: Math.ceil(total / limit),
-      },
-    };
+  // Nếu muốn tìm kiếm theo ID hoặc tên người nhận (JSON shippingInfo)
+  if (search) {
+    where.OR = [
+      { id: Number.isNaN(+search) ? undefined : +search },
+      { shippingInfo: { path: ['to', 'name'], string_contains: search } }, // Prisma 5+
+    ].filter(Boolean);
   }
 
-  // Lấy chi tiết order theo ID
-  async getOrderById(id: number) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
+  const [orders, total] = await this.prisma.$transaction([
+    this.prisma.order.findMany({
+      where,
+      skip,
+      take: limit,
       include: {
-        items: { include: { productVariant: { include: { product: true } } } },
+        items: {
+          include: { productVariant: { include: { product: true } } },
+        },
         payments: true,
         user: true,
+        paymentMethod: true,
       },
-    });
+      orderBy: { createdAt: 'desc' },
+    }),
+    this.prisma.order.count({ where }),
+  ]);
 
-    if (!order)
-      return { success: false, message: 'Order không tồn tại', data: null };
+  return {
+    success: true,
+    message: 'Lấy danh sách order thành công',
+    data: {
+      data: orders.map((o) => new OrderResponseDto(o as any)),
+      total,
+      page,
+      pageCount: Math.ceil(total / limit),
+    },
+  };
+}
 
-    return {
-      success: true,
-      message: 'Lấy order thành công',
-      data: new OrderResponseDto(order),
-    };
-  }
+  // Lấy chi tiết order theo ID
+async getOrderById(id: number) {
+  const order = await this.prisma.order.findUnique({
+    where: { 
+      id,
+      tenantId: this.tenantId // 🎯 THÊM TENANT ID
+    },
+    include: {
+      items: { include: { productVariant: { include: { product: true } } } },
+      payments: true,
+      user: true,
+    },
+  });
+
+  if (!order)
+    return { success: false, message: 'Order không tồn tại', data: null };
+
+  return {
+    success: true,
+    message: 'Lấy order thành công',
+    data: new OrderResponseDto(order),
+  };
+}
 
 async updateOrder(id: number, dto: UpdateOrderDto) {
   const existing = await this.prisma.order.findUnique({ 
-    where: { id },
+    where: { 
+      id,
+      tenantId: this.tenantId // 🎯 THÊM TENANT ID
+    },
     select: { id: true, status: true, inventoryUpdated: true },
   });
   if (!existing) return { success: false, message: 'Order không tồn tại' };
@@ -290,7 +299,10 @@ async updateOrder(id: number, dto: UpdateOrderDto) {
 
 async updateInventoryFromOrder(orderId: number, newStatus: OrderStatus, action: 'DEDUCT' | 'RESTORE') {
   const order = await this.prisma.order.findUnique({
-    where: { id: orderId },
+    where: { 
+      id: orderId,
+      tenantId: this.tenantId // 🎯 THÊM TENANT ID
+    },
     include: {
       items: true,
     },
@@ -341,7 +353,12 @@ async updateInventoryFromOrder(orderId: number, newStatus: OrderStatus, action: 
 
   // Xóa order
   async deleteOrder(id: number) {
-    const existing = await this.prisma.order.findUnique({ where: { id } });
+    const existing = await this.prisma.order.findUnique({ 
+      where: { 
+        id,
+        tenantId: this.tenantId // 🎯 THÊM TENANT ID
+      } 
+    });
     if (!existing) return { success: false, message: 'Order không tồn tại' };
 
     await this.prisma.order.delete({ where: { id } });
@@ -349,38 +366,43 @@ async updateInventoryFromOrder(orderId: number, newStatus: OrderStatus, action: 
     return { success: true, message: 'Xóa order thành công' };
   }
 
-  async getOrdersByUser(userId: number, page = 1, limit = 10) {
-    const skip = (page - 1) * limit;
+async getOrdersByUser(userId: number, page = 1, limit = 10) {
+  const skip = (page - 1) * limit;
 
-    // Lọc theo userId
-    const orders = await this.prisma.order.findMany({
-      where: { userId },
-      skip,
-      take: Number(limit),
-      include: {
-        items: {
-          include: { productVariant: { include: { product: true } } },
-        },
-        payments: true,
-        user: true,
-        paymentMethod: true,
+  // Lọc theo userId VÀ tenantId
+  const where = {
+    userId,
+    tenantId: this.tenantId // 🎯 THÊM TENANT ID
+  };
+
+  const orders = await this.prisma.order.findMany({
+    where,
+    skip,
+    take: Number(limit),
+    include: {
+      items: {
+        include: { productVariant: { include: { product: true } } },
       },
-      orderBy: { createdAt: 'desc' },
-    });
+      payments: true,
+      user: true,
+      paymentMethod: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
 
-    const total = await this.prisma.order.count({ where: { userId } });
+  const total = await this.prisma.order.count({ where });
 
-    return {
-      success: true,
-      message: 'Lấy danh sách đơn hàng của người dùng thành công',
-      data: {
-        data: orders.map((order) => new OrderResponseDto(order as any)),
-        total,
-        page,
-        pageCount: Math.ceil(total / limit),
-      },
-    };
-  }
+  return {
+    success: true,
+    message: 'Lấy danh sách đơn hàng của người dùng thành công',
+    data: {
+      data: orders.map((order) => new OrderResponseDto(order as any)),
+      total,
+      page,
+      pageCount: Math.ceil(total / limit),
+    },
+  };
+}
 
   async checkUserPurchasedProduct(productId: number, userId: number) {
     const order = await this.prisma.order.findFirst({
