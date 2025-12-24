@@ -12,7 +12,7 @@ export class UploadService {
 
   constructor(private configService: ConfigService) {
     // Thư mục lưu ảnh trên VPS
-    this.uploadDir = this.configService.get<string>('UPLOAD_DIR', '/var/www/store.aiban.vn/uploads');
+    this.uploadDir = this.configService.get<string>('UPLOAD_DIR', '/app/uploads');
 
     // URL public để truy cập ảnh
     this.publicUrl = this.configService.get<string>('UPLOAD_PUBLIC_URL', 'https://store.aiban.vn/uploads');
