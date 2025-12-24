@@ -1,96 +1,83 @@
 // upload.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-import { BadRequestException } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class UploadService {
-  private supabase;
+  private readonly uploadDir: string;
+  private readonly publicUrl: string; // URL base để truy cập ảnh (ví dụ https://store.aiban.vn/uploads)
 
   constructor(private configService: ConfigService) {
-    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
-    const supabaseKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase URL or Key is missing in environment variables');
+    // Thư mục lưu ảnh trên VPS
+    this.uploadDir = this.configService.get<string>('UPLOAD_DIR', '/var/www/store.aiban.vn/uploads');
+
+    // URL public để truy cập ảnh
+    this.publicUrl = this.configService.get<string>('UPLOAD_PUBLIC_URL', 'https://store.aiban.vn/uploads');
+
+    // Tạo thư mục nếu chưa tồn tại
+    if (!fs.existsSync(this.uploadDir)) {
+      fs.mkdirSync(this.uploadDir, { recursive: true });
+      console.log(`📁 Thư mục upload đã được tạo: ${this.uploadDir}`);
     }
-    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
-  // Thay đổi tên bucket từ 'avatars' thành 'images'
-  private get bucketName(): string {
-    return this.configService.get<string>('SUPABASE_BUCKET_NAME', 'images'); // Đổi thành 'images'
-  }
-
+  /**
+   * Upload ảnh lên VPS (local storage)
+   * @param file Express.Multer.File
+   * @returns URL public của ảnh
+   */
   async uploadLocalImage(file: Express.Multer.File): Promise<string> {
-    const fileName = `${uuidv4()}-${file.originalname}`;
-    const filePath = `uploads/${fileName}`;
-
-    // Upload file
-    const { data, error } = await this.supabase.storage
-      .from(this.bucketName)
-      .upload(filePath, file.buffer, {
-        contentType: file.mimetype,
-        upsert: true,
-      });
-
-    if (error) {
-      throw new BadRequestException('Không thể tải lên ảnh: ' + error.message);
+    if (!file || !file.buffer) {
+      throw new BadRequestException('File không hợp lệ');
     }
 
-    // Lấy public URL - API mới không có error return
-    const { data: publicUrlData } = this.supabase.storage
-      .from(this.bucketName)
-      .getPublicUrl(filePath);
+    // Kiểm tra loại file (chỉ cho phép ảnh)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Chỉ hỗ trợ định dạng ảnh: JPEG, PNG, GIF, WebP, SVG');
+    }
 
-    return publicUrlData.publicUrl; // Trả về publicUrl
+    // Tạo tên file unique
+    const ext = path.extname(file.originalname);
+    const fileName = `${uuidv4()}${ext}`;
+    const filePath = path.join(this.uploadDir, fileName);
+
+    // Ghi file vào disk
+    try {
+      fs.writeFileSync(filePath, file.buffer);
+      console.log(`✅ Upload thành công: ${filePath}`);
+    } catch (error) {
+      console.error('❌ Lỗi ghi file:', error);
+      throw new BadRequestException('Không thể lưu ảnh lên server');
+    }
+
+    // Trả về URL public
+    return `${this.publicUrl.replace(/\/$/, '')}/${fileName}`;
   }
 
-  // Hàm xóa file từ Supabase Storage
+  /**
+   * Xóa ảnh cũ khi update
+   * @param imageUrl URL ảnh cũ (ví dụ https://store.aiban.vn/uploads/abc.jpg)
+   */
   async deleteLocalImage(imageUrl: string): Promise<void> {
-    if (!imageUrl) {
-      return;
-    }
+    if (!imageUrl) return;
 
     try {
-      // Xử lý cả URL đầy đủ và relative path
-      let filePath: string;
+      // Trích xuất tên file từ URL
+      const urlPath = new URL(imageUrl).pathname;
+      const fileName = path.basename(urlPath);
+      const filePath = path.join(this.uploadDir, fileName);
 
-      if (imageUrl.startsWith('http')) {
-        // URL đầy đủ từ Supabase: https://xxx.supabase.co/storage/v1/object/public/images/uploads/abc.jpg
-        const bucketPath = `/storage/v1/object/public/${this.bucketName}/`;
-        
-        if (!imageUrl.includes(bucketPath)) {
-          return;
-        }
-
-        const parts = imageUrl.split(bucketPath);
-        if (parts.length < 2 || !parts[1]) {
-          return;
-        }
-        
-        filePath = parts[1];
-      } else {
-        // Relative path: uploads/abc.jpg
-        filePath = imageUrl.replace(/^\/+/, ''); // Xóa dấu / đầu nếu có
-      }
-
-
-      const { error } = await this.supabase.storage
-        .from(this.bucketName)
-        .remove([filePath]);
-
-      if (error) {
-        console.error('❌ Lỗi xóa file:', error.message);
-        // Không throw error để không làm gián đoạn việc update
-        // throw new BadRequestException('Không thể xóa ảnh: ' + error.message);
-      } else {
-        console.log('✅ Xóa file thành công:', filePath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`✅ Đã xóa ảnh cũ: ${filePath}`);
       }
     } catch (error) {
-      console.error('❌ Lỗi khi xóa ảnh:', error);
-      // Không throw để không làm gián đoạn việc update
+      console.error('❌ Lỗi xóa ảnh:', error);
+      // Không throw để không làm gián đoạn update config
     }
   }
 }

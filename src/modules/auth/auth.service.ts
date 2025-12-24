@@ -87,61 +87,6 @@ export class AuthService {
     return { message: 'Đổi mật khẩu thành công' };
   }
 
-    // 🟡 Gửi mail reset password
-  private async sendResetEmail(email: string, token: string) {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: email,
-      subject: 'Yêu cầu đặt lại mật khẩu',
-      html: `
-        <h2>Xin chào!</h2>
-        <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
-        <p>Vui lòng nhấn vào liên kết bên dưới để đặt lại mật khẩu (hết hạn sau 15 phút):</p>
-        <a href="${resetLink}" style="color: #1e88e5;">Đặt lại mật khẩu</a>
-        <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
-      `,
-    });
-  }
-
-  async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-
-    if (!user) throw new NotFoundException('Không tìm thấy người dùng với email này');
-
-    // Tạo token reset (hết hạn sau 15 phút)
-    const secret = process.env.JWT_SECRET || 'F3!r7@xP9#sLq2ZmV&bNcT*UYj8dWvHr';
-    const token = jwt.sign({ email: user.email }, secret, {
-      expiresIn: '15m',
-    });
-
-    // Lưu token vào DB
-    await this.prisma.user.update({
-      where: { email: user.email },
-      data: {
-        resetToken: token,
-        resetTokenExpiry: new Date(Date.now() + 15 * 60 * 1000),
-      },
-    });
-
-    await this.sendResetEmail(user.email, token);
-    return {
-      message: 'Token đặt lại mật khẩu đã được tạo',
-      // token,
-    };
-  }
-
   // 🟣 RESET PASSWORD
   async resetPassword(dto: ResetPasswordDto) {
     let payload: any;

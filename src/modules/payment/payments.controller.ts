@@ -42,7 +42,6 @@ export class PaymentsController {
   }
 
   @Get('vnpay')
-  @UseGuards(TenantGuard)
   createVnpayPayment(
     @Query('orderId') orderIdStr: string,
     @Query('amount') amountStr: string,
@@ -90,59 +89,55 @@ export class PaymentsController {
 
   // Callback từ VNPay sau khi thanh toán
   @Get('vnpay/callback')
-  async handleVnpayReturn(
-    @Query() query: any, 
-    @Res() res: Response,
-    @Headers() headers: any, // 🔥 NHẬN headers để verify
-  ) {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    
-    // 🔥 LẤY config từ headers để verify
-    const vnpayConfig = {
-      tmnCode: headers['vnp-tmn-code'] || process.env.VNP_TMN_CODE,
-      secretKey: headers['vnp-secret'] || process.env.VNP_SECRET,
-      vnpUrl: headers['vnp-api-url'] || process.env.VNP_API_URL,
-    };
+    async handleVnpayReturn(
+      @Query() query: any,
+      @Res() res: Response,
+      @Headers() headers: any,
+    ) {
+      const vnpayConfig = {
+        tmnCode: headers['vnp-tmn-code'] || process.env.VNP_TMN_CODE,
+        secretKey: headers['vnp-secret'] || process.env.VNP_SECRET,
+        vnpUrl: headers['vnp-api-url'] || process.env.VNP_API_URL,
+      };
 
-    // 🔥 TRUYỀN config vào service
-    const result = this.vnpayService.verifyReturnUrl(query, vnpayConfig);
+      const result = this.vnpayService.verifyReturnUrl(query, vnpayConfig);
 
-    // Kiểm tra tính hợp lệ của chữ ký
-    if (!result.isValid) {
-      return res.redirect(`${frontendUrl}/xac-nhan-don-hang?status=failed&message=Chữ ký không hợp lệ`);
-    }
+      // Lấy returnUrl từ query param mà VNPay mang theo
+      const rawReturnUrl = query.returnUrl as string;
+      const returnUrl = rawReturnUrl ? decodeURIComponent(rawReturnUrl) : '';
 
-    // Kiểm tra mã phản hồi của giao dịch
-    if (result.responseCode === '00') {
       const orderId = parseInt(result.orderId, 10);
-      if (isNaN(orderId)) {
-        return res.redirect(`${frontendUrl}/xac-nhan-don-hang?status=failed&message=OrderId không hợp lệ`);
+
+      // Chữ ký không hợp lệ
+      if (!result.isValid) {
+        return res.redirect(`${returnUrl}?status=failed&message=Chữ ký không hợp lệ`);
       }
 
-      // Lấy tenantId từ đơn hàng
-      const order = await this.prisma.order.findUnique({
-        where: { id: orderId },
-        select: { tenantId: true },
-      });
+      if (result.responseCode === '00') {
+        // Thanh toán thành công
+        const order = await this.prisma.order.findUnique({
+          where: { id: orderId },
+          select: { tenantId: true },
+        });
 
-      if (!order) {
-        return res.redirect(`${frontendUrl}/xac-nhan-don-hang?status=failed&message=Không tìm thấy order`);
+        if (!order) {
+          return res.redirect(`${returnUrl}?status=failed&message=Không tìm thấy đơn hàng`);
+        }
+
+        await this.paymentsService.createOrUpdateFromVnpay({
+          ...result,
+          orderId: result.orderId,
+          tenantId: order.tenantId,
+        });
+
+        return res.redirect(
+          `${returnUrl}?status=success&orderId=${orderId}&amount=${result.amount}&transactionNo=${result.transactionNo}&payDate=${result.payDate}&bankCode=${result.bankCode}`,
+        );
       }
 
-      // Gọi service để cập nhật thông tin thanh toán
-      await this.paymentsService.createOrUpdateFromVnpay({
-        ...result,
-        orderId: result.orderId,
-        tenantId: order.tenantId,
-      });
-
-      // Redirect tới trang kết quả thanh toán với các tham số cần thiết
-      return res.redirect(`${frontendUrl}/xac-nhan-don-hang?status=success&orderId=${orderId}&amount=${result.amount}&transactionNo=${result.transactionNo}&payDate=${result.payDate}&bankCode=${result.bankCode}`);
+      // Thanh toán thất bại
+      return res.redirect(`${returnUrl}?status=failed&message=Thanh toán thất bại (mã: ${result.responseCode})`);
     }
-
-    // Nếu thanh toán thất bại
-    return res.redirect(`${frontendUrl}/xac-nhan-don-hang?status=failed&message=Thanh toán thất bại`);
-  }
 
   @Get()
   @UseGuards(JwtAuthGuard)
