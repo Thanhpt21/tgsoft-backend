@@ -30,33 +30,41 @@ export class UploadService {
    * @returns URL public của ảnh
    */
   async uploadLocalImage(file: Express.Multer.File): Promise<string> {
-    if (!file || !file.buffer) {
-      throw new BadRequestException('File không hợp lệ');
-    }
-
-    // Kiểm tra loại file (chỉ cho phép ảnh)
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Chỉ hỗ trợ định dạng ảnh: JPEG, PNG, GIF, WebP, SVG');
-    }
-
-    // Tạo tên file unique
-    const ext = path.extname(file.originalname);
-    const fileName = `${uuidv4()}${ext}`;
-    const filePath = path.join(this.uploadDir, fileName);
-
-    // Ghi file vào disk
-    try {
-      fs.writeFileSync(filePath, file.buffer);
-      console.log(`✅ Upload thành công: ${filePath}`);
-    } catch (error) {
-      console.error('❌ Lỗi ghi file:', error);
-      throw new BadRequestException('Không thể lưu ảnh lên server');
-    }
-
-    // Trả về URL public
-    return `${this.publicUrl.replace(/\/$/, '')}/${fileName}`;
+  if (!file || !file.buffer) {
+    throw new BadRequestException('File không hợp lệ');
   }
+
+  // Kiểm tra loại file
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+  if (!allowedTypes.includes(file.mimetype)) {
+    throw new BadRequestException('Chỉ hỗ trợ định dạng ảnh: JPEG, PNG, GIF, WebP, SVG');
+  }
+
+  // Tạo tên file unique
+  const ext = path.extname(file.originalname);
+  const fileName = `${uuidv4()}${ext}`;
+  const filePath = path.join(this.uploadDir, fileName);
+
+  // ===== THÊM LOG DEBUG =====
+  console.log('📁 UPLOAD_DIR từ config:', this.uploadDir);
+  console.log('📄 File path sẽ ghi:', filePath);
+  console.log('📂 Thư mục tồn tại?', fs.existsSync(this.uploadDir));
+  if (fs.existsSync(this.uploadDir)) {
+    console.log('📂 Quyền thư mục:', fs.statSync(this.uploadDir).mode.toString(8));
+  }
+
+  // Ghi file vào disk
+  try {
+    fs.writeFileSync(filePath, file.buffer);
+    console.log(`✅ Ghi file thành công: ${filePath}`);
+  } catch (error) {
+    console.error('❌ Lỗi ghi file:', error);
+    throw new BadRequestException('Không thể lưu ảnh lên server: ' + error.message);
+  }
+
+  // Trả về URL public
+  return `${this.publicUrl.replace(/\/$/, '')}/${fileName}`;
+}
 
   /**
    * Xóa ảnh cũ khi update
